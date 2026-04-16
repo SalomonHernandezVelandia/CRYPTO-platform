@@ -14,8 +14,8 @@ DATA_PATH = os.path.join(BASE_DIR, "data", "raw", "binance")
 
 SYMBOLS = [
     "BTCUSDT", "ETHUSDT", "XRPUSDT", "SOLUSDT",
-    "DOGEUSDT", "ADAUSDT", "LINKUSDT", "XMRUSDT",
-    "AVAXUSDT", "HBARUSDT", "SHIBUSDT", "PEPEUSDT", "XLMUSDT"
+    "DOGEUSDT", "ADAUSDT", "LINKUSDT",
+    "AVAXUSDT", "HBARUSDT", "SHIBUSDT", "PEPEUSDT"
 ]
 
 # -------------------------------
@@ -134,7 +134,6 @@ st.title("📊 Crypto Dashboard")
 
 symbol = st.selectbox("Selecciona una criptomoneda", SYMBOLS)
 
-# 🔥 Intervalo y rango en la misma fila
 col1, col2 = st.columns(2)
 
 with col1:
@@ -146,10 +145,14 @@ with col1:
 with col2:
     range_option = st.radio(
         "Rango de visualización",
-        ["Todo", "1 Semana", "1 Mes", "1 Año"]
+        ["1 Mes", "1 Semana", "1 Año", "Todo"],
+        index=0  # 👈 esto lo hace default
     )
 
 prominence = st.slider("Sensibilidad de swings", 0.01, 0.2, 0.05)
+
+# 🔥 NUEVO
+window_swings = st.slider("Ventana swings", 5, 30, 10)
 
 # -------------------------------
 # 📊 Procesamiento
@@ -159,14 +162,30 @@ df = filter_by_range(df, range_option)
 df = resample_data(df, interval)
 
 # -------------------------------
+# 📊 VOLUMEN
+# -------------------------------
+df["vol_ma_20"] = df["volume"].rolling(20).mean()
+
+# -------------------------------
+# 📈 VWAP
+# -------------------------------
+df["cum_vol"] = df["volume"].cumsum()
+df["cum_vol_price"] = (df["close"] * df["volume"]).cumsum()
+df["vwap"] = df["cum_vol_price"] / df["cum_vol"]
+
+
+# -------------------------------
+# 📈 Medias móviles
+# -------------------------------
+df["ma_20"] = df["close"].rolling(20).mean()
+df["ma_50"] = df["close"].rolling(50).mean()
+
+# -------------------------------
 # 🔍 Swings
 # -------------------------------
 swings = get_trade_swings(df, prominence)
 
-peak_y = []
-valley_y = []
-peak_x = []
-valley_x = []
+peak_y, valley_y, peak_x, valley_x = [], [], [], []
 
 for idx, typ in swings:
     if typ == "peak":
@@ -177,67 +196,88 @@ for idx, typ in swings:
         valley_y.append(df["close"].iloc[idx])
 
 # -------------------------------
-# 📊 Promedios
+# 📊 Promedios dinámicos
 # -------------------------------
-avg_peak = np.mean(peak_y) if len(peak_y) > 0 else None
-avg_valley = np.mean(valley_y) if len(valley_y) > 0 else None
+WINDOW_SWINGS = window_swings
+
+recent_peaks = peak_y[-WINDOW_SWINGS:] if len(peak_y) >= WINDOW_SWINGS else peak_y
+recent_valleys = valley_y[-WINDOW_SWINGS:] if len(valley_y) >= WINDOW_SWINGS else valley_y
+
+avg_peak = np.mean(recent_peaks) if len(recent_peaks) > 0 else None
+avg_valley = np.mean(recent_valleys) if len(recent_valleys) > 0 else None
 
 # -------------------------------
-# 📈 Mostrar métricas (mejoradas)
+# 📈 Métricas
 # -------------------------------
 col_left, col_right = st.columns(2)
 
-# 🔥 formateo seguro
-valor_valley = f"{avg_valley:.6f}" if avg_valley is not None else "N/A"
-valor_peak = f"{avg_peak:.6f}" if avg_peak is not None else "N/A"
+valor_valley = f"{avg_valley:.6f}" if avg_valley else "N/A"
+valor_peak = f"{avg_peak:.6f}" if avg_peak else "N/A"
 
 with col_left:
-    st.markdown(
-        f"<h3 style='color:red;'>Compra: {valor_valley}</h3>",
-        unsafe_allow_html=True
-    )
+    st.markdown(f"<h3 style='color:red;'>Compra: {valor_valley}</h3>", unsafe_allow_html=True)
 
 with col_right:
-    st.markdown(
-        f"<h3 style='color:green; text-align:right;'>Venta: {valor_peak}</h3>",
-        unsafe_allow_html=True
-    )
+    st.markdown(f"<h3 style='color:green; text-align:right;'>Venta: {valor_peak}</h3>", unsafe_allow_html=True)
 
 # -------------------------------
-# 📈 Gráfica
+# 📈 GRÁFICA
 # -------------------------------
 st.subheader(f"{symbol} - {interval}")
 
 fig = go.Figure()
 
-# precio
+# volumen como barras (transparente)
+fig.add_trace(go.Bar(
+    x=df.index,
+    y=df["volume"],
+    name="Volumen",
+    opacity=0.15,
+    yaxis="y2"
+))
+
+# Precio
 fig.add_trace(go.Scatter(
     x=df.index,
     y=df["close"],
     mode='lines',
-    name='Precio'
+    name='Precio',
+    line=dict(color='white', width=3)
 ))
 
-# picos
+# MA
 fig.add_trace(go.Scatter(
-    x=peak_x,
-    y=peak_y,
-    mode='markers',
-    marker=dict(color='green', size=10),
-    name='Venta'
+    x=df.index,
+    y=df["ma_20"],
+    mode='lines',
+    name='MA 20',
+    line=dict(color='yellow', width=2, dash='dot'),
+    opacity=0.7
+))
+fig.add_trace(go.Scatter(
+    x=df.index,
+    y=df["ma_50"],
+    mode='lines',
+    name='MA 50',
+    line=dict(color='magenta', width=2, dash='dash'),
+    opacity=0.7
 ))
 
-# valles
+# VWAP
 fig.add_trace(go.Scatter(
-    x=valley_x,
-    y=valley_y,
-    mode='markers',
-    marker=dict(color='red', size=10),
-    name='Compra'
+    x=df.index,
+    y=df["vwap"],
+    mode='lines',
+    name='VWAP',
+    line=dict(color='orange', width=1.5)
 ))
+
+# Picos y valles
+fig.add_trace(go.Scatter(x=peak_x, y=peak_y, mode='markers', marker=dict(color='green'), name='Venta'))
+fig.add_trace(go.Scatter(x=valley_x, y=valley_y, mode='markers', marker=dict(color='red'), name='Compra'))
 
 # -------------------------------
-# 🟣 DIBUJAR TRADES GUARDADOS
+# 🟣 TRADES GUARDADOS
 # -------------------------------
 symbol_trades = TRADES.get(symbol, [])
 
@@ -246,25 +286,24 @@ for trade in symbol_trades:
     trade_date = pd.to_datetime(trade["date"])
     trade_price = trade["price"]
 
-    # ignorar si está fuera del rango visible
     if trade_date < df.index.min() or trade_date > df.index.max():
         continue
 
-    # 🟣 punto
+    # punto
     fig.add_trace(go.Scatter(
         x=[trade_date],
         y=[trade_price],
         mode='markers',
         marker=dict(
             color='purple',
-            size=14,
+            size=12,
             symbol='circle',
-            line=dict(color='white', width=2)  # brillo
+            line=dict(color='white', width=2)
         ),
-        name='Entrada' if trade == symbol_trades[0] else None
+        name='Entrada'
     ))
 
-    # 🟣 línea vertical
+    # línea vertical
     fig.add_vline(
         x=trade_date,
         line_dash="dash",
@@ -272,38 +311,51 @@ for trade in symbol_trades:
         line_width=1
     )
 
-    # 🟣 línea horizontal
+    # línea horizontal
     fig.add_hline(
         y=trade_price,
         line_dash="dot",
         line_color="purple"
     )
 
-# líneas
+# Líneas promedio
 if avg_peak:
     fig.add_hline(y=avg_peak, line_dash="dash", line_color="green")
 
 if avg_valley:
     fig.add_hline(y=avg_valley, line_dash="dash", line_color="red")
 
-# zona azul
+# -------------------------------
+# 🔵 ZONA ENTRE COMPRA Y VENTA
+# -------------------------------
 if avg_peak is not None and avg_valley is not None:
     fig.add_hrect(
         y0=avg_valley,
         y1=avg_peak,
-        fillcolor="blue",
-        opacity=0.30,
+        fillcolor="gold",
+        opacity=0.1,
         layer="below",
         line_width=0,
     )
 
-# layout
+# Layout
 fig.update_layout(
-    xaxis=dict(
-        range=[df.index.min(), df.index.max()],
-        rangeslider=dict(visible=True)
+    plot_bgcolor='black',
+    paper_bgcolor='black',
+    font=dict(color='white'),
+    xaxis=dict(rangeslider=dict(visible=True)),
+    
+    yaxis=dict(
+        title="Precio"
     ),
-    yaxis_title="Precio",
+
+    yaxis2=dict(
+        title="Volumen",
+        overlaying="y",
+        side="right",
+        showgrid=False
+    ),
+
     xaxis_title="Fecha"
 )
 

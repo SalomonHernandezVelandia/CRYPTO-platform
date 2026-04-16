@@ -89,14 +89,66 @@ Muy positivo → mercado sobrecomprado
 Muy negativo → sobrevendido
 
 ===ESTADISTICAS===
+🔵 MA 20 (rápida)
+Sigue el precio muy de cerca
+Detecta cambios rápidos
+Son medias móviles (Moving Averages):
+MA 20 → promedio de los últimos 20 periodos
+MA 50 → promedio de los últimos 50 periodos
+👉 En tu caso (1H):
+MA 20 = últimas 20 horas
+MA 50 = últimas 50 horas
+
+🟣 MA 50 (lenta)
+Más estable
+Define tendencia general
+
+📊 Interpretación clave
+📈 Tendencia alcista
+Precio arriba de ambas
+MA20 encima de MA50
+👉 Mercado fuerte
+
+📉 Tendencia bajista
+Precio debajo de ambas
+MA20 debajo de MA50
+👉 Mercado débil
+
+⚠️ Mercado lateral
+Las líneas se cruzan constantemente
+Precio las atraviesa todo el tiempo
+👉 No hay dirección clara (zona peligrosa)
+
+
+
+
 🔥 1. VWAP (OBLIGATORIO)
 Precio promedio ponderado por volumen
 Te dice:
 Precio “justo” del mercado
-Uso:
-Precio > VWAP → caro
-Precio < VWAP → barato
-👉 MUCHÍSIMO mejor que tu promedio de picos
+🟢 Precio por ENCIMA de VWAP
+👉 mercado “caro”
+compradores dominan
+presión alcista
+💡 institucionales:
+no les gusta comprar aquí
+
+🔴 Precio por DEBAJO de VWAP
+👉 mercado “barato”
+vendedores dominan
+presión bajista
+💡 institucionales:
+buscan comprar aquí
+
+⚖️ Precio CERCA del VWAP
+👉 equilibrio
+mercado justo
+zona de consenso
+
+
+
+
+
 
 🔥 2. Bandas de volatilidad (tipo Bollinger)
 En vez de solo líneas:
