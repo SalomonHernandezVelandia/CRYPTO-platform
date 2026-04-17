@@ -4,6 +4,7 @@ import os
 import plotly.graph_objects as go
 import numpy as np
 from scipy.signal import find_peaks
+from analytics.backtesting.backtester import Backtester
 
 # 🔥 Hacer app más ancha
 st.set_page_config(layout="wide")
@@ -132,27 +133,27 @@ def get_trade_swings(df, prominence=0.05):
 # -------------------------------
 st.title("📊 Crypto Dashboard")
 
-symbol = st.selectbox("Selecciona una criptomoneda", SYMBOLS)
-
-col1, col2 = st.columns(2)
+col1, col2, col3, col4 = st.columns([1,1,1,1.2])
 
 with col1:
+    symbol = st.selectbox("Crypto", SYMBOLS)
+
+with col2:
     interval = st.radio(
-        "Intervalo de tiempo",
+        "Intervalo",
         ["1H", "Diario", "Semanal", "Mensual", "Anual"]
     )
 
-with col2:
+with col3:
     range_option = st.radio(
-        "Rango de visualización",
+        "Rango",
         ["1 Mes", "1 Semana", "1 Año", "Todo"],
-        index=0  # 👈 esto lo hace default
+        index=0
     )
 
-prominence = st.slider("Sensibilidad de swings", 0.01, 0.2, 0.05)
-
-# 🔥 NUEVO
-window_swings = st.slider("Ventana swings", 5, 30, 10)
+with col4:
+    prominence = st.slider("Sensibilidad", 0.01, 0.2, 0.05)
+    window_swings = st.slider("Ventana", 5, 30, 10)
 
 # -------------------------------
 # 📊 Procesamiento
@@ -160,6 +161,12 @@ window_swings = st.slider("Ventana swings", 5, 30, 10)
 df = load_data(symbol)
 df = filter_by_range(df, range_option)
 df = resample_data(df, interval)
+
+# -------------------------------
+# 🧪 BACKTESTING
+# -------------------------------
+bt = Backtester(df)
+results = bt.run()
 
 # -------------------------------
 # 📊 VOLUMEN
@@ -180,10 +187,42 @@ df["vwap"] = df["cum_vol_price"] / df["cum_vol"]
 df["ma_20"] = df["close"].rolling(20).mean()
 df["ma_50"] = df["close"].rolling(50).mean()
 
+
+# -------------------------------
+# 📈 Tendencia (Trend)
+# -------------------------------
+df["trend"] = np.where(df["ma_20"] > df["ma_50"], "bullish", "bearish")
+
+# tendencia actual
+current_trend = df["trend"].iloc[-1]
+
 # -------------------------------
 # 🔍 Swings
 # -------------------------------
 swings = get_trade_swings(df, prominence)
+
+# -------------------------------
+# 🌍 Contexto de mercado
+# -------------------------------
+
+# volatilidad simple (no ATR)
+df["volatility"] = df["close"].rolling(20).std()
+
+# rango reciente
+df["range"] = df["high"].rolling(20).max() - df["low"].rolling(20).min()
+
+current_volatility = df["volatility"].iloc[-1]
+current_range = df["range"].iloc[-1]
+
+# lógica de contexto
+if current_volatility > df["volatility"].mean() * 1.5:
+    market_context = "volatile"
+
+elif current_range < df["range"].mean() * 0.8:
+    market_context = "ranging"
+
+else:
+    market_context = "trending"
 
 peak_y, valley_y, peak_x, valley_x = [], [], [], []
 
@@ -203,22 +242,98 @@ WINDOW_SWINGS = window_swings
 recent_peaks = peak_y[-WINDOW_SWINGS:] if len(peak_y) >= WINDOW_SWINGS else peak_y
 recent_valleys = valley_y[-WINDOW_SWINGS:] if len(valley_y) >= WINDOW_SWINGS else valley_y
 
-avg_peak = np.mean(recent_peaks) if len(recent_peaks) > 0 else None
-avg_valley = np.mean(recent_valleys) if len(recent_valleys) > 0 else None
+# -------------------------------
+# ⚖️ Promedios ponderados por tendencia
+# -------------------------------
+
+def weighted_average(values, weights):
+    if len(values) == 0:
+        return None
+    return np.sum(np.array(values) * np.array(weights)) / np.sum(weights)
+
+# -------------------------------
+# ⚖️ Pesos con contexto de mercado
+# -------------------------------
+
+if market_context == "ranging":
+    # en rango → tu estrategia funciona mejor
+    valley_weights = np.linspace(1.5, 1.0, len(recent_valleys))
+    peak_weights = np.linspace(1.5, 1.0, len(recent_peaks))
+
+elif market_context == "trending":
+
+    if current_trend == "bullish":
+        valley_weights = np.linspace(1.5, 1.0, len(recent_valleys))
+        peak_weights = np.linspace(0.5, 1.0, len(recent_peaks))
+
+    else:
+        peak_weights = np.linspace(1.5, 1.0, len(recent_peaks))
+        valley_weights = np.linspace(0.5, 1.0, len(recent_valleys))
+
+elif market_context == "volatile":
+    # mercado peligroso → reducir impacto
+    valley_weights = np.linspace(0.7, 1.0, len(recent_valleys))
+    peak_weights = np.linspace(0.7, 1.0, len(recent_peaks))
+
+# cálculo final
+avg_peak = weighted_average(recent_peaks, peak_weights) if len(recent_peaks) > 0 else None
+avg_valley = weighted_average(recent_valleys, valley_weights) if len(recent_valleys) > 0 else None
 
 # -------------------------------
 # 📈 Métricas
 # -------------------------------
-col_left, col_right = st.columns(2)
+col1, col2, col3, col4 = st.columns(4)
+trend_label = "📈" if current_trend == "bullish" else "📉"
 
-valor_valley = f"{avg_valley:.6f}" if avg_valley else "N/A"
-valor_peak = f"{avg_peak:.6f}" if avg_peak else "N/A"
-
-with col_left:
+valor_valley = f"{avg_valley:.6f} {trend_label}" if avg_valley else "N/A"
+valor_peak = f"{avg_peak:.6f} {trend_label}" if avg_peak else "N/A"
+# 🟥 COMPRA
+with col1:
     st.markdown(f"<h3 style='color:red;'>Compra: {valor_valley}</h3>", unsafe_allow_html=True)
 
-with col_right:
-    st.markdown(f"<h3 style='color:green; text-align:right;'>Venta: {valor_peak}</h3>", unsafe_allow_html=True)
+# 📈 TREND
+with col2:
+    if current_trend == "bullish":
+        st.markdown("<h3 style='color:lime;'>📈 Alcista</h3>", unsafe_allow_html=True)
+    else:
+        st.markdown("<h3 style='color:red;'>📉 Bajista</h3>", unsafe_allow_html=True)
+
+# 🌍 CONTEXTO
+with col3:
+    if market_context == "trending":
+        st.markdown("<h3 style='color:cyan;'>🌍 Tendencial</h3>", unsafe_allow_html=True)
+    elif market_context == "ranging":
+        st.markdown("<h3 style='color:orange;'>🌍 Lateral</h3>", unsafe_allow_html=True)
+    else:
+        st.markdown("<h3 style='color:red;'>🌍 Volátil</h3>", unsafe_allow_html=True)
+
+# 🟩 VENTA
+with col4:
+    st.markdown(
+        f"<h3 style='color:lime; text-align:right;'>💰 Venta: {valor_peak}</h3>",
+        unsafe_allow_html=True
+    )
+
+# -------------------------------
+# 📊 RESULTADOS BACKTESTING
+# -------------------------------
+col1, col2, col3, col4, col5 = st.columns(5)
+
+with col1:
+    st.metric("Retorno", f"{results['total_return']*100:.2f}%")
+
+with col2:
+    st.metric("Win Rate", f"{results['win_rate']*100:.2f}%")
+
+with col3:
+    st.metric("Drawdown", f"{results['max_drawdown']*100:.2f}%")
+
+with col4:
+    st.metric("Sharpe", f"{results['sharpe_ratio']:.2f}")
+
+with col5:
+    st.metric("Trades", results["total_trades"])
+
 
 # -------------------------------
 # 📈 GRÁFICA
@@ -261,6 +376,20 @@ fig.add_trace(go.Scatter(
     name='MA 50',
     line=dict(color='magenta', width=2, dash='dash'),
     opacity=0.7
+))
+
+# -------------------------------
+# 📈 Trend visual (fondo)
+# -------------------------------
+bullish_mask = df["trend"] == "bullish"
+
+fig.add_trace(go.Scatter(
+    x=df.index,
+    y=df["close"].where(bullish_mask),
+    mode='lines',
+    line=dict(color='rgba(0,255,0,0.1)', width=10),
+    name='Trend Alcista',
+    showlegend=False
 ))
 
 # VWAP
@@ -329,10 +458,11 @@ if avg_valley:
 # 🔵 ZONA ENTRE COMPRA Y VENTA
 # -------------------------------
 if avg_peak is not None and avg_valley is not None:
+    zone_color = "rgba(0,255,0,0.2)" if current_trend == "bullish" else "rgba(255,0,0,0.2)"
     fig.add_hrect(
         y0=avg_valley,
         y1=avg_peak,
-        fillcolor="gold",
+        fillcolor=zone_color,
         opacity=0.1,
         layer="below",
         line_width=0,
