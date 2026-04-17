@@ -5,6 +5,9 @@ import plotly.graph_objects as go
 import numpy as np
 from scipy.signal import find_peaks
 from analytics.backtesting.backtester import Backtester
+from exchange_API.binance.client import get_order_book
+import time
+from analytics.signals.signal_engine import compute_signal
 
 # 🔥 Hacer app más ancha
 st.set_page_config(layout="wide")
@@ -49,6 +52,21 @@ def load_data(symbol):
 
     return df
 
+@st.cache_data
+def load_funding(symbol):
+    file_path = os.path.join(DATA_PATH, "funding_rate", f"{symbol}.csv")
+
+    if not os.path.exists(file_path):
+        return None
+
+    df = pd.read_csv(file_path)
+    df["time"] = pd.to_datetime(df["time"])
+    df = df.set_index("time")
+
+    return df
+
+
+
 # -------------------------------
 # 🔄 Resampling
 # -------------------------------
@@ -71,7 +89,8 @@ def resample_data(df, interval):
         "high": "max",
         "low": "min",
         "close": "last",
-        "volume": "sum"
+        "volume": "sum",
+        "fundingRate": "mean"   # 🔥 clave
     })
 
     return df
@@ -128,10 +147,45 @@ def get_trade_swings(df, prominence=0.05):
 
     return filtered
 
+
+def analyze_order_book(orderbook):
+
+    bids = orderbook.get("bids", [])
+    asks = orderbook.get("asks", [])
+
+    # convertir a float
+    bids = [(float(p), float(q)) for p, q in bids]
+    asks = [(float(p), float(q)) for p, q in asks]
+
+    # volumen total
+    bid_volume = sum(q for _, q in bids)
+    ask_volume = sum(q for _, q in asks)
+
+    # imbalance
+    imbalance = bid_volume / (bid_volume + ask_volume) if (bid_volume + ask_volume) > 0 else 0
+
+    # mejores precios
+    best_bid = bids[0][0] if bids else None
+    best_ask = asks[0][0] if asks else None
+
+    return {
+        "bid_volume": bid_volume,
+        "ask_volume": ask_volume,
+        "imbalance": imbalance,
+        "best_bid": best_bid,
+        "best_ask": best_ask
+    }
+
+
 # -------------------------------
 # 🎛️ UI
 # -------------------------------
 st.title("📊 Crypto Dashboard")
+
+# 🔄 Auto-refresh cada X segundos
+refresh_rate = 5  # segundos
+auto_refresh = st.checkbox("🔄 Auto-refresh Order Book", value=False)
+refresh_rate = st.slider("Segundos", 1, 10, 5)
 
 col1, col2, col3, col4 = st.columns([1,1,1,1.2])
 
@@ -155,12 +209,48 @@ with col4:
     prominence = st.slider("Sensibilidad", 0.01, 0.2, 0.05)
     window_swings = st.slider("Ventana", 5, 30, 10)
 
+if auto_refresh:
+    time.sleep(refresh_rate)
+    st.rerun()
+
 # -------------------------------
 # 📊 Procesamiento
 # -------------------------------
 df = load_data(symbol)
+funding_df = load_funding(symbol)
+
+if funding_df is not None:
+    df = df.merge(funding_df, left_index=True, right_index=True, how="left")
+    df["fundingRate"] = df["fundingRate"].ffill()
+
 df = filter_by_range(df, range_option)
 df = resample_data(df, interval)
+
+@st.cache_data(ttl=5)
+def load_order_book(symbol):
+    return get_order_book(symbol, limit=100)
+orderbook = load_order_book(symbol)
+ob_metrics = analyze_order_book(orderbook)
+
+imbalance = ob_metrics["imbalance"]
+
+bids = orderbook.get("bids", [])
+asks = orderbook.get("asks", [])
+
+bids = [(float(p), float(q)) for p, q in bids]
+asks = [(float(p), float(q)) for p, q in asks]
+
+# ordenar
+bids = sorted(bids, key=lambda x: x[0], reverse=True)
+asks = sorted(asks, key=lambda x: x[0])
+
+# acumulado
+bid_prices = [p for p, q in bids]
+bid_qty = np.cumsum([q for _, q in bids])
+
+ask_prices = [p for p, q in asks]
+ask_qty = np.cumsum([q for _, q in asks])
+
 
 # -------------------------------
 # 🧪 BACKTESTING
@@ -234,6 +324,21 @@ for idx, typ in swings:
         valley_x.append(df.index[idx])
         valley_y.append(df["close"].iloc[idx])
 
+
+#----------------------
+if "fundingRate" in df.columns and not df["fundingRate"].isna().all():
+    current_funding = df["fundingRate"].iloc[-1]
+else:
+    current_funding = 0
+
+if current_funding > 0.0001:
+    funding_bias = "longs_paying"
+elif current_funding < -0.0001:
+    funding_bias = "shorts_paying"
+else:
+    funding_bias = "neutral"
+
+
 # -------------------------------
 # 📊 Promedios dinámicos
 # -------------------------------
@@ -279,6 +384,24 @@ elif market_context == "volatile":
 avg_peak = weighted_average(recent_peaks, peak_weights) if len(recent_peaks) > 0 else None
 avg_valley = weighted_average(recent_valleys, valley_weights) if len(recent_valleys) > 0 else None
 
+
+
+#=======================================
+price = df["close"].iloc[-1]
+signal_data = compute_signal(
+    price=price,
+    vwap=df["vwap"].iloc[-1],
+    trend=current_trend,
+    funding=current_funding,
+    imbalance=imbalance,
+    avg_valley=avg_valley,
+    avg_peak=avg_peak
+)
+signal = signal_data["signal"]
+score = signal_data["score"]
+
+
+
 # -------------------------------
 # 📈 Métricas
 # -------------------------------
@@ -290,6 +413,7 @@ valor_peak = f"{avg_peak:.6f} {trend_label}" if avg_peak else "N/A"
 # 🟥 COMPRA
 with col1:
     st.markdown(f"<h3 style='color:red;'>Compra: {valor_valley}</h3>", unsafe_allow_html=True)
+    st.metric("Funding", f"{current_funding:.5f}")
 
 # 📈 TREND
 with col2:
@@ -314,6 +438,7 @@ with col4:
         unsafe_allow_html=True
     )
 
+
 # -------------------------------
 # 📊 RESULTADOS BACKTESTING
 # -------------------------------
@@ -334,6 +459,21 @@ with col4:
 with col5:
     st.metric("Trades", results["total_trades"])
 
+
+if signal == "STRONG BUY":
+    st.success(f"🚀 {signal} (Score: {score})")
+
+elif signal == "BUY":
+    st.info(f"🟢 {signal} (Score: {score})")
+
+elif signal == "SELL":
+    st.warning(f"🟠 {signal} (Score: {score})")
+
+elif signal == "STRONG SELL":
+    st.error(f"🔴 {signal} (Score: {score})")
+
+else:
+    st.write(f"⚪ HOLD (Score: {score})")
 
 # -------------------------------
 # 📈 GRÁFICA
@@ -385,11 +525,10 @@ bullish_mask = df["trend"] == "bullish"
 
 fig.add_trace(go.Scatter(
     x=df.index,
-    y=df["close"].where(bullish_mask),
+    y=df["close"],
     mode='lines',
-    line=dict(color='rgba(0,255,0,0.1)', width=10),
-    name='Trend Alcista',
-    showlegend=False
+    name='Precio',
+    line=dict(color='white', width=3)
 ))
 
 # VWAP
@@ -447,6 +586,16 @@ for trade in symbol_trades:
         line_color="purple"
     )
 
+if "fundingRate" in df.columns:
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=df["fundingRate"],
+        mode='lines',
+        name='Funding Rate',
+        line=dict(color='cyan', width=1),
+        yaxis="y3"
+    ))
+
 # Líneas promedio
 if avg_peak:
     fig.add_hline(y=avg_peak, line_dash="dash", line_color="green")
@@ -486,10 +635,71 @@ fig.update_layout(
         showgrid=False
     ),
 
+    yaxis3=dict(
+        title="Funding",
+        overlaying="y",
+        side="right",
+        position=0.95,
+        showgrid=False
+    ),
+
     xaxis_title="Fecha"
 )
 
+
 st.plotly_chart(fig, use_container_width=True)
+
+st.subheader("📊 Order Book Depth")
+
+fig_ob = go.Figure()
+
+fig_ob.add_trace(go.Scatter(
+    x=bid_prices,
+    y=bid_qty,
+    mode='lines',
+    name='Bids',
+    line=dict(color='green')
+))
+
+fig_ob.add_trace(go.Scatter(
+    x=ask_prices,
+    y=ask_qty,
+    mode='lines',
+    name='Asks',
+    line=dict(color='red')
+))
+
+fig_ob.update_layout(
+    plot_bgcolor='black',
+    paper_bgcolor='black',
+    font=dict(color='white'),
+    xaxis_title="Precio",
+    yaxis_title="Volumen acumulado"
+)
+
+st.plotly_chart(fig_ob, use_container_width=True)
+
+
+# -------------------------------
+# 📊 ORDER BOOK
+# -------------------------------
+col_ob1, col_ob2, col_ob3 = st.columns(3)
+
+with col_ob1:
+    st.metric("Bid Volume", f"{ob_metrics['bid_volume']:.2f}")
+
+with col_ob2:
+    st.metric("Ask Volume", f"{ob_metrics['ask_volume']:.2f}")
+
+with col_ob3:
+    st.metric("Imbalance", f"{imbalance:.2f}")
+
+if imbalance > 0.55:
+    st.success("🟢 Presión compradora (posible soporte)")
+elif imbalance < 0.45:
+    st.error("🔴 Presión vendedora (posible resistencia)")
+else:
+    st.warning("🟡 Mercado balanceado")
 
 # -------------------------------
 # 📋 Tabla

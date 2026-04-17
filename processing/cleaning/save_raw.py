@@ -36,3 +36,38 @@ def save_raw_to_csv(data, symbol, base_path):
     df.to_csv(file_path, index=False)
 
     print(f"Actualizado: {file_path}")
+
+
+def save_funding_to_csv(data, symbol, base_path):
+
+    df = pd.DataFrame(data)
+
+    df["fundingTime"] = pd.to_datetime(df["fundingTime"], unit="ms")
+    df["fundingRate"] = df["fundingRate"].astype(float)
+
+    df = df[["fundingTime", "fundingRate"]]
+    df = df.rename(columns={"fundingTime": "time"})
+
+    # ✅ NUEVA RUTA
+    path = os.path.join(base_path, "data", "raw", "binance", "funding_rate")
+    os.makedirs(path, exist_ok=True)
+
+    file_path = os.path.join(path, f"{symbol}.csv")
+
+    if os.path.exists(file_path):
+        old_df = pd.read_csv(file_path)
+
+        # 🔥 FIX CLAVE (por si hay archivos viejos)
+        if "time" not in old_df.columns:
+            print(f"⚠️ Archivo viejo detectado en {symbol}, regenerando...")
+            old_df = pd.DataFrame(columns=["time", "fundingRate"])
+        else:
+            old_df["time"] = pd.to_datetime(old_df["time"])
+
+        df = pd.concat([old_df, df])
+        df = df.drop_duplicates(subset=["time"])
+        df = df.sort_values("time")
+
+    df.to_csv(file_path, index=False)
+
+    print(f"Funding actualizado: {file_path}")
