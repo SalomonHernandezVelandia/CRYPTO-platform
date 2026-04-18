@@ -372,6 +372,92 @@ Para generar señales más robustas que el análisis tradicional.
 
 ---
 
+CRYPTO-platform/
+│
+├── data/                # TODO lo relacionado a datos
+│   ├── sources/         # APIs (Binance, etc)
+│   ├── storage/         # raw, processed, features
+│   ├── database/        # SQL, conexiones
+│   └── loaders/         # cargar datos
+│
+├── processing/          # transformación de datos
+│   ├── cleaning/
+│   ├── feature_engineering/
+│   └── transformations/
+│
+├── analytics/           # cálculos
+│   ├── indicators/
+│   ├── statistics/
+│   └── signals/
+│
+├── visualization/       # gráficas
+│   ├── charts/
+│   └── dashboards/
+│
+├── services/            # lógica de negocio (orquestación)
+│
+├── interfaces/          # outputs
+│   ├── telegram/
+│   └── api/
+│
+├── jobs/                # scripts ejecutables
+
+
+CRYPTO-platform/
+│
+├── src/
+│   │
+│   ├── api/                      # 🔌 Conexión a APIs externas
+│   │   ├── binance/
+│   │   │   ├── client.py         # precios spot
+│   │   │   ├── futures.py        # perp + funding
+│   │   │   └── orderbook.py
+│   │   │
+│   │   └── telegram/
+│   │       └── client.py
+│   │
+│   ├── data/                     # 💾 Manejo de datos
+│   │   ├── loaders.py            # load_data()
+│   │   ├── savers.py             # guardar csv/sql
+│   │   ├── schemas.py            # formato estándar
+│   │   └── storage/
+│   │       ├── raw/
+│   │       ├── processed/
+│   │       └── features/
+│   │
+│   ├── features/                 # 🧮 Cálculos reutilizables
+│   │   ├── indicators.py         # MA, VWAP
+│   │   ├── swings.py             # get_trade_swings
+│   │   ├── volatility.py
+│   │   └── funding.py
+│   │
+│   ├── signals/                  # 🧠 Lógica de trading
+│   │   ├── rules.py              # buy/sell conditions
+│   │   ├── engine.py             # genera señales
+│   │   └── scoring.py
+│   │
+│   ├── visualization/           # 📊 Gráficas
+│   │   ├── charts.py
+│   │   └── styles.py
+│   │
+│   ├── apps/                     # 🚀 Casos de uso
+│   │   ├── dashboard/
+│   │   │   └── app.py
+│   │   │
+│   │   └── alerts/
+│   │       └── telegram_bot.py
+│   │
+│   └── config/                  # ⚙️ Config global
+│       └── settings.py
+│
+├── jobs/                        # ⏱ Scripts ejecutables
+│   ├── fetch_data.py
+│   └── run_signals.py
+│
+└── README.md
+
+
+
 
 CRYPTO-platform/
 │
@@ -380,20 +466,27 @@ CRYPTO-platform/
 │   │   └── notifier.py        # Envía mensajes
 │   └── manager.py             # decide cuándo alertar
 │
-├── analytics/
+├── analytics/                  # Todos los calculos
 │   ├── backtesting/
-│   │   └── backtester.py 
+│   │   ├── backtester.py 
+│   │   └── service.py 
 │   ├── chart/
+│   │   ├── output/
 │   │   ├── chart_builder.py 
-│   │   └── output/
+│   │   └── plotters.py 
 │   ├── indicators/
+│   │   ├── market_indicators.py     # cálculos puros
+│   │   ├── orderbook.py
+│   │   ├── swings.py
+│   │   └── weighted_levels.py
+│   ├── signals/                # NUEVO (CLAVE)
+│   │   ├── signal_engine.py
+│   │   ├── market_context.py       # decisiones de contexto
+│   │   └── scoring.py
 │   ├── statistics/
 │   ├── reports/
-│   │   └── plot_prices.py      # Para graficar Bitcoin
-│   └── signals/                # NUEVO (CLAVE)
-│       ├── signal_engine.py
-│       ├── scoring.py
-│       └── rules.py
+│       └── plot_prices.py      # Para graficar Bitcoin
+│   └── pipeline.py
 │
 ├── app/
 │   └── dashboard.py            # Graficar el comportamiento de las monedas          
@@ -408,11 +501,7 @@ CRYPTO-platform/
 │           ├── ...     
 │           └── funding_rate /
 │               ├── ETHUSD.csv     
-│               └── ...
-│
-├── exchange_API/
-│   └── binance/
-│       └── client.py           # Donde se adquieren los datos desde binance       
+│               └── ...      
 │
 ├── jobs/
 │   ├── fetch_binance_data.py   # El script principal para correr todo el codigo de extraccion
@@ -428,6 +517,11 @@ CRYPTO-platform/
 │   ├── transformations/
 │   └── feature_engineering/
 │
+├── src/
+│   ├── api/                   # Conexión a APIs externas
+│   │   ├── binance/
+│   │   │   └── client.py      # Conexion a la api de binance
+│
 │
 ├── .gitignore
 └── README.md
@@ -435,6 +529,8 @@ CRYPTO-platform/
 
 cd "G:\PYTHON\Proyectos Personales\CRYPTO-platform"
 python -m streamlit run app/dashboard.py
+
+python -m jobs.fetch_binance_data
 
 python -m jobs.run_signal
 
