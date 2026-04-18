@@ -78,6 +78,9 @@ def main():
         else:
             print(f"{symbol} funding actualizado")
 
+    # 👇 después de actualizar todo
+    from jobs.run_signal import run
+    run()
 
 if __name__ == "__main__":
     main()

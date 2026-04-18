@@ -6,7 +6,6 @@ import numpy as np
 from scipy.signal import find_peaks
 from analytics.backtesting.backtester import Backtester
 from exchange_API.binance.client import get_order_book
-import time
 from analytics.signals.signal_engine import compute_signal
 
 # 🔥 Hacer app más ancha
@@ -18,8 +17,8 @@ DATA_PATH = os.path.join(BASE_DIR, "data", "raw", "binance")
 
 SYMBOLS = [
     "BTCUSDT", "ETHUSDT", "XRPUSDT", "SOLUSDT",
-    "DOGEUSDT", "ADAUSDT", "LINKUSDT",
-    "AVAXUSDT", "HBARUSDT", "SHIBUSDT", "PEPEUSDT"
+    "DOGEUSDT", "ADAUSDT", "LINKUSDT", "XMRUSDT",
+    "AVAXUSDT", "HBARUSDT", "SHIBUSDT", "PEPEUSDT", "XLMUSDT"
 ]
 
 # -------------------------------
@@ -182,11 +181,6 @@ def analyze_order_book(orderbook):
 # -------------------------------
 st.title("📊 Crypto Dashboard")
 
-# 🔄 Auto-refresh cada X segundos
-refresh_rate = 5  # segundos
-auto_refresh = st.checkbox("🔄 Auto-refresh Order Book", value=False)
-refresh_rate = st.slider("Segundos", 1, 10, 5)
-
 col1, col2, col3, col4 = st.columns([1,1,1,1.2])
 
 with col1:
@@ -209,9 +203,6 @@ with col4:
     prominence = st.slider("Sensibilidad", 0.01, 0.2, 0.05)
     window_swings = st.slider("Ventana", 5, 30, 10)
 
-if auto_refresh:
-    time.sleep(refresh_rate)
-    st.rerun()
 
 # -------------------------------
 # 📊 Procesamiento
@@ -226,10 +217,7 @@ if funding_df is not None:
 df = filter_by_range(df, range_option)
 df = resample_data(df, interval)
 
-@st.cache_data(ttl=5)
-def load_order_book(symbol):
-    return get_order_book(symbol, limit=100)
-orderbook = load_order_book(symbol)
+orderbook = get_order_book(symbol, limit=100)
 ob_metrics = analyze_order_book(orderbook)
 
 imbalance = ob_metrics["imbalance"]
@@ -281,7 +269,7 @@ df["ma_50"] = df["close"].rolling(50).mean()
 # -------------------------------
 # 📈 Tendencia (Trend)
 # -------------------------------
-df["trend"] = np.where(df["ma_20"] > df["ma_50"], "bullish", "bearish")
+df["trend"] = np.where(df["ma_20"] > df["ma_50"], "Bullish", "Bearish")
 
 # tendencia actual
 current_trend = df["trend"].iloc[-1]
@@ -367,7 +355,7 @@ if market_context == "ranging":
 
 elif market_context == "trending":
 
-    if current_trend == "bullish":
+    if current_trend == "Bullish":
         valley_weights = np.linspace(1.5, 1.0, len(recent_valleys))
         peak_weights = np.linspace(0.5, 1.0, len(recent_peaks))
 
@@ -406,7 +394,7 @@ score = signal_data["score"]
 # 📈 Métricas
 # -------------------------------
 col1, col2, col3, col4 = st.columns(4)
-trend_label = "📈" if current_trend == "bullish" else "📉"
+trend_label = "📈" if current_trend == "Bullish" else "📉"
 
 valor_valley = f"{avg_valley:.6f} {trend_label}" if avg_valley else "N/A"
 valor_peak = f"{avg_peak:.6f} {trend_label}" if avg_peak else "N/A"
@@ -417,7 +405,7 @@ with col1:
 
 # 📈 TREND
 with col2:
-    if current_trend == "bullish":
+    if current_trend == "Bullish":
         st.markdown("<h3 style='color:lime;'>📈 Alcista</h3>", unsafe_allow_html=True)
     else:
         st.markdown("<h3 style='color:red;'>📉 Bajista</h3>", unsafe_allow_html=True)
@@ -425,11 +413,11 @@ with col2:
 # 🌍 CONTEXTO
 with col3:
     if market_context == "trending":
-        st.markdown("<h3 style='color:cyan;'>🌍 Tendencial</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color:cyan;'>Tendencial</h3>", unsafe_allow_html=True)
     elif market_context == "ranging":
-        st.markdown("<h3 style='color:orange;'>🌍 Lateral</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color:orange;'>Lateral</h3>", unsafe_allow_html=True)
     else:
-        st.markdown("<h3 style='color:red;'>🌍 Volátil</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color:red;'>Volátil</h3>", unsafe_allow_html=True)
 
 # 🟩 VENTA
 with col4:
@@ -521,7 +509,7 @@ fig.add_trace(go.Scatter(
 # -------------------------------
 # 📈 Trend visual (fondo)
 # -------------------------------
-bullish_mask = df["trend"] == "bullish"
+Bullish_mask = df["trend"] == "Bullish"
 
 fig.add_trace(go.Scatter(
     x=df.index,
@@ -607,7 +595,7 @@ if avg_valley:
 # 🔵 ZONA ENTRE COMPRA Y VENTA
 # -------------------------------
 if avg_peak is not None and avg_valley is not None:
-    zone_color = "rgba(0,255,0,0.2)" if current_trend == "bullish" else "rgba(255,0,0,0.2)"
+    zone_color = "rgba(0,255,0,0.2)" if current_trend == "Bullish" else "rgba(255,0,0,0.2)"
     fig.add_hrect(
         y0=avg_valley,
         y1=avg_peak,
@@ -678,6 +666,7 @@ fig_ob.update_layout(
 )
 
 st.plotly_chart(fig_ob, use_container_width=True)
+fig.write_image("chart.png")
 
 
 # -------------------------------

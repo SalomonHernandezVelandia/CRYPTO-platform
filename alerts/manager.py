@@ -1,34 +1,28 @@
-def build_signal_message(symbol, signal_data, extra_data):
+def build_signal_message(symbol, data):
 
-    signal = signal_data["signal"]
-    score = signal_data["score"]
+    peak = f"{data['w_peak']:.5f}" if data["w_peak"] else "N/A"
+    valley = f"{data['w_valley']:.5f}" if data["w_valley"] else "N/A"
 
-    price = extra_data["price"]
-    vwap = extra_data["vwap"]
-    trend = extra_data["trend"]
-    funding = extra_data["funding"]
-    imbalance = extra_data["imbalance"]
+    trend_emoji = "📈" if data["trend"] == "Bullish" else "📉"
 
-    # 🎯 Emoji dinámico
-    if "BUY" in signal:
-        emoji = "🟢"
-    elif "SELL" in signal:
-        emoji = "🔴"
+    if data["context"] == "trending":
+        context_emoji = "Tendencial"
+    elif data["context"] == "ranging":
+        context_emoji = "Lateral"
     else:
-        emoji = "🟡"
+        context_emoji = "Volátil"
+
+    funding = f"{data['funding']:.5f}"
 
     message = f"""
-{emoji} *{symbol}*
+🪙 *{symbol}* ==> Precio: {data['price']:.5f}
+                                VWAP: {data['vwap_week']:.5f}
 
-📊 *Señal:* {signal}
-🧠 *Score:* {score}
-
-💰 *Precio:* {price:.2f}
-📉 *VWAP:* {vwap:.2f}
-
-📈 *Trend:* {trend}
-💸 *Funding:* {funding:.5f}
-📚 *Imbalance:* {imbalance:.2f}
+Buy: {valley}    |    Sell: {peak}
+🔄 Trades: {data['trades_week']}
+{trend_emoji} Trend: {data['trend']}
+🌍 Contexto Mercado: {context_emoji}
+💰 Funding: {funding}
 """
 
     return message

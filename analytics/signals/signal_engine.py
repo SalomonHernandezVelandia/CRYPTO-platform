@@ -5,7 +5,8 @@ def compute_signal(
     funding,
     imbalance,
     avg_valley,
-    avg_peak
+    avg_peak,
+    market_context=None   # 👈 nuevo
 ):
     score = 0
 
@@ -48,6 +49,9 @@ def compute_signal(
         score += 2
     elif avg_peak is not None and price >= avg_peak:
         score -= 2
+
+    if market_context == "volatile":
+        score *= 0.8
 
     # ---------------------------
     # 🎯 Interpretación

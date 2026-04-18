@@ -381,6 +381,11 @@ CRYPTO-platform/
 │   └── manager.py             # decide cuándo alertar
 │
 ├── analytics/
+│   ├── backtesting/
+│   │   └── backtester.py 
+│   ├── chart/
+│   │   ├── chart_builder.py 
+│   │   └── output/
 │   ├── indicators/
 │   ├── statistics/
 │   ├── reports/
@@ -389,9 +394,6 @@ CRYPTO-platform/
 │       ├── signal_engine.py
 │       ├── scoring.py
 │       └── rules.py
-│
-├── backtesting/
-│   └── backtester.py/
 │
 ├── app/
 │   └── dashboard.py            # Graficar el comportamiento de las monedas          
