@@ -1,121 +1,57 @@
-# 📊 Crypto Trading Dashboard & Signal Engine
+<p align="center">
+  <img src="assets/Bitcoin_Portada.png" width="100%"/>
+</p>
+
+# Crypto Trading Dashboard & Signal Engine
 
 Este proyecto es una plataforma de análisis de mercado cripto que combina datos históricos, métricas en tiempo real y lógica cuantitativa para generar señales de compra y venta.
 
 ---
 
-# 🪙 Activos soportados
+## 🪙 Activos soportados
 
 Actualmente el sistema trabaja con los siguientes pares:
 
-* BTCUSDT (Bitcoin)
-* ETHUSDT (Ethereum)
-* XRPUSDT
-* SOLUSDT
-* DOGEUSDT
-* ADAUSDT
-* LINKUSDT
-* AVAXUSDT
-* HBARUSDT
-* SHIBUSDT
-* PEPEUSDT
+| BTCUSDT (Bitcoin)      | ETHUSDT (Ethereum)       | XRPUSDT             |
+|------------------------|--------------------------|---------------------|
+| SOLUSDT (Solana)       | DOGEUSDT (Dogecoin)      | ADAUSDT (Cardano)   |
+| LINKUSDT (Chainlink)   | XLMUSDT (Stellar)        | AVAXUSDT (Avalanche)|
+| HBARUSDT (Hedera)      | SHIBUSDT (Shiba Inu)     | PEPEUSDT            | 
 
 ---
 
-# 📈 Tendencia (Trend)
-
+## 📈 Tendencia (Trend)
 La tendencia se calcula usando medias móviles:
-
 * MA 20 (media rápida)
 * MA 50 (media lenta)
 
-## Posibles estados:
 
-### 📈 Alcista (bullish)
+|               | 📈 Alcista (bullish) | 📉 Bajista (bearish)|
+|---------------|----------------------|----------------------|
+| Condición     | MA20 > MA50          | MA20 < MA50          |
+| Interpretación| El precio está en una fase de crecimiento, Mayor probabilidad de continuación al alza, Favorece compras en retrocesos| El precio está en caída, Mayor probabilidad de continuación bajista, Favorece ventas o evitar compras|
 
-**Condición:**
-MA20 > MA50
-
-**Interpretación:**
-
-* El precio está en una fase de crecimiento
-* Mayor probabilidad de continuación al alza
-* Favorece compras en retrocesos
 
 ---
 
-### 📉 Bajista (bearish)
-
-**Condición:**
-MA20 < MA50
-
-**Interpretación:**
-
-* El precio está en caída
-* Mayor probabilidad de continuación bajista
-* Favorece ventas o evitar compras
-
----
-
-# 🌍 Contexto de mercado
+## 🌍 Contexto de mercado
 
 El sistema clasifica el mercado en 3 estados:
 
 ---
-
-### 🔵 Tendencial (trending)
-
-**Condición:**
-Movimiento direccional claro
-
-**Interpretación:**
-
-* Mercado con dirección definida
-* Estrategias de seguimiento de tendencia funcionan mejor
+|               |🔵 Tendencial (trending)     |🟠 Lateral (ranging)            |🔴 Volátil (volatile)             |
+|---------------|-----------------------------|---------------------------------|-----------------------------------|
+| Condición     | Movimiento direccional claro| Rango estrecho y baja expansión |Alta desviación estándar del precio|
+| Interpretación| Mercado con dirección definida, Estrategias de seguimiento de tendencia funcionan mejor| Precio se mueve entre soporte y resistencia, Ideal para comprar en mínimos y vender en máximos|Movimientos bruscos, Mayor riesgo, Señales menos confiables |
 
 ---
 
-### 🟠 Lateral (ranging)
-
-**Condición:**
-Rango estrecho y baja expansión
-
-**Interpretación:**
-
-* Precio se mueve entre soporte y resistencia
-* Ideal para comprar en mínimos y vender en máximos
-
----
-
-### 🔴 Volátil (volatile)
-
-**Condición:**
-Alta desviación estándar del precio
-
-**Interpretación:**
-
-* Movimientos bruscos
-* Mayor riesgo
-* Señales menos confiables
-
----
-
-# 💰 Funding Rate
-
-## ¿Qué es?
+## 💰 Funding Rate
 
 Es el costo que pagan los traders en contratos perpetuos (futuros).
-
 * Lo pagan los LONGS o los SHORTS dependiendo del mercado
-
-## ¿De dónde se obtiene?
-
 * API de Binance (futuros)
 * Se guarda en `data/raw/binance/funding_rate/`
-
----
-
-## Interpretación:
 
 ### Funding > 0
 
@@ -372,131 +308,41 @@ Para generar señales más robustas que el análisis tradicional.
 
 ---
 
-CRYPTO-platform/
-│
-├── data/                # TODO lo relacionado a datos
-│   ├── sources/         # APIs (Binance, etc)
-│   ├── storage/         # raw, processed, features
-│   ├── database/        # SQL, conexiones
-│   └── loaders/         # cargar datos
-│
-├── processing/          # transformación de datos
-│   ├── cleaning/
-│   ├── feature_engineering/
-│   └── transformations/
-│
-├── analytics/           # cálculos
-│   ├── indicators/
-│   ├── statistics/
-│   └── signals/
-│
-├── visualization/       # gráficas
-│   ├── charts/
-│   └── dashboards/
-│
-├── services/            # lógica de negocio (orquestación)
-│
-├── interfaces/          # outputs
-│   ├── telegram/
-│   └── api/
-│
-├── jobs/                # scripts ejecutables
-
-
-CRYPTO-platform/
-│
-├── src/
-│   │
-│   ├── api/                      # 🔌 Conexión a APIs externas
-│   │   ├── binance/
-│   │   │   ├── client.py         # precios spot
-│   │   │   ├── futures.py        # perp + funding
-│   │   │   └── orderbook.py
-│   │   │
-│   │   └── telegram/
-│   │       └── client.py
-│   │
-│   ├── data/                     # 💾 Manejo de datos
-│   │   ├── loaders.py            # load_data()
-│   │   ├── savers.py             # guardar csv/sql
-│   │   ├── schemas.py            # formato estándar
-│   │   └── storage/
-│   │       ├── raw/
-│   │       ├── processed/
-│   │       └── features/
-│   │
-│   ├── features/                 # 🧮 Cálculos reutilizables
-│   │   ├── indicators.py         # MA, VWAP
-│   │   ├── swings.py             # get_trade_swings
-│   │   ├── volatility.py
-│   │   └── funding.py
-│   │
-│   ├── signals/                  # 🧠 Lógica de trading
-│   │   ├── rules.py              # buy/sell conditions
-│   │   ├── engine.py             # genera señales
-│   │   └── scoring.py
-│   │
-│   ├── visualization/           # 📊 Gráficas
-│   │   ├── charts.py
-│   │   └── styles.py
-│   │
-│   ├── apps/                     # 🚀 Casos de uso
-│   │   ├── dashboard/
-│   │   │   └── app.py
-│   │   │
-│   │   └── alerts/
-│   │       └── telegram_bot.py
-│   │
-│   └── config/                  # ⚙️ Config global
-│       └── settings.py
-│
-├── jobs/                        # ⏱ Scripts ejecutables
-│   ├── fetch_data.py
-│   └── run_signals.py
-│
-└── README.md
-
-
-
 
 CRYPTO-platform/
 │
 ├── alerts/
 │   ├── telegram/
-│   │   └── notifier.py        # Envía mensajes
-│   └── manager.py             # decide cuándo alertar
+│   │   └── notifier.py                 # Envía mensajes a Telegram, Usa API de Telegram
+│   └── manager.py                      # Construye el mensaje, Formatea texto bonito para Telegram
 │
-├── analytics/                  # Todos los calculos
+├── analytics/                          # Todos los calculos
 │   ├── backtesting/
-│   │   ├── backtester.py 
-│   │   └── service.py 
+│   │   ├── backtester.py               # Simula estrategia en el pasado
+│   │   └── service.py                  # Solo ejecuta el backtester
 │   ├── chart/
 │   │   ├── output/
 │   │   ├── chart_builder.py 
-│   │   └── plotters.py 
+│   │   └── plotters.py                 # Construye gráfico completo, es el grafico principal
 │   ├── indicators/
-│   │   ├── market_indicators.py     # cálculos puros
-│   │   ├── orderbook.py
-│   │   ├── swings.py
-│   │   └── weighted_levels.py
-│   ├── signals/                # NUEVO (CLAVE)
+│   │   ├── market_indicators.py        # Añade columnas al DataFrame, VWAP, MA20, MA50, tendencia, contexto, etc, Base de todo el análisis
+│   │   ├── orderbook.py                # Analiza libro de órdenes
+│   │   ├── swings.py                   # Detecta picos y valles reales, esto define soportes y resistencias
+│   │   └── weighted_levels.py          # Calcula niveles inteligentes
+│   ├── signals/                
 │   │   ├── signal_engine.py
-│   │   ├── market_context.py       # decisiones de contexto
-│   │   └── scoring.py
-│   ├── statistics/
-│   ├── reports/
-│       └── plot_prices.py      # Para graficar Bitcoin
-│   └── pipeline.py
+│   │   └── market_context.py           # Añade inteligencia macro
+│   └── pipeline.py                     # Este es el corazón del sistema, devuelve TODO listo para usar
 │
 ├── app/
-│   └── dashboard.py            # Graficar el comportamiento de las monedas          
+│   └── dashboard.py                    # Interfaz visual (Streamlit)         
 │
 ├── data/
-│   ├── features/                   # datos crudos (raw API)
-│   ├── processed/                  # datos limpios
+│   ├── features/                   
+│   ├── processed/                      # Datos limpios
 │   └── raw/  
 │       └── binance /
-│           ├── BTCUSD.csv      # Donde se guardan los datos de Bitcoin historicos
+│           ├── BTCUSD.csv              # Donde se guardan los datos de Bitcoin historicos
 │           ├── ETHUSD.csv      
 │           ├── ...     
 │           └── funding_rate /
@@ -504,24 +350,20 @@ CRYPTO-platform/
 │               └── ...      
 │
 ├── jobs/
-│   ├── fetch_binance_data.py   # El script principal para correr todo el codigo de extraccion
-│   └── run_signals.py          # ejecuta el sistema en vivo
-│
-├── monitoring/
-│   ├── alerts/
-│   └── logging/
+│   ├── fetch_binance_data.py           # Descarga datos de Binance, solo descarga datos nuevos, evita duplicados
+│   └── run_signals.py                  # Sistema en vivo, es el bot trader
 │
 ├── processing/
-│   ├── cleaning/
-│       └── save_raw.py         # Para guardar los datos descargdos
-│   ├── transformations/
-│   └── feature_engineering/
+│   └── cleaning/
+│       └── save_raw.py                 # Guarda datos en CSV
 │
 ├── src/
-│   ├── api/                   # Conexión a APIs externas
+│   ├── api/                            
 │   │   ├── binance/
-│   │   │   └── client.py      # Conexion a la api de binance
-│
+│   │   │   └── client.py               # Conecta con Binance
+│   └── config/                         
+│       ├── paths.py
+│       └── settings.py                 # Símbolos, intervalos, trades de ejemplo
 │
 ├── .gitignore
 └── README.md

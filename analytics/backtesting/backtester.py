@@ -10,27 +10,26 @@ class Backtester:
         self.position = 0
         self.trades = []
 
+
     def weighted_average(self, values, weights):
         if len(values) == 0:
             return None
         return np.sum(np.array(values) * np.array(weights)) / np.sum(weights)
 
+
     def compute_context(self):
         df = self.df
-
         df["ma_20"] = df["close"].rolling(20).mean()
         df["ma_50"] = df["close"].rolling(50).mean()
         df["trend"] = np.where(df["ma_20"] > df["ma_50"], "bullish", "bearish")
-
         df["volatility"] = df["close"].rolling(20).std()
         df["range"] = df["high"].rolling(20).max() - df["low"].rolling(20).min()
-
         return df
+
 
     def get_context(self, row, df):
         vol_mean = df["volatility"].mean()
         range_mean = df["range"].mean()
-
         if row["volatility"] > vol_mean * 1.5:
             return "volatile"
         elif row["range"] < range_mean * 0.8:
@@ -38,22 +37,17 @@ class Backtester:
         else:
             return "trending"
 
+
     def run(self):
         df = self.compute_context()
-
         equity_curve = []
-
         for i in range(50, len(df)):
-
             window = df.iloc[:i]
             current_price = df["close"].iloc[i]
             row = df.iloc[i]
-
             context = self.get_context(row, df)
             trend = row["trend"]
-
             closes = window["close"].values
-
             peaks = []
             valleys = []
 
@@ -69,7 +63,6 @@ class Backtester:
             if context == "ranging":
                 peak_weights = np.linspace(1.5, 1.0, len(recent_peaks))
                 valley_weights = np.linspace(1.5, 1.0, len(recent_valleys))
-
             elif context == "trending":
                 if trend == "bullish":
                     valley_weights = np.linspace(1.5, 1.0, len(recent_valleys))
@@ -77,7 +70,6 @@ class Backtester:
                 else:
                     peak_weights = np.linspace(1.5, 1.0, len(recent_peaks))
                     valley_weights = np.linspace(0.5, 1.0, len(recent_valleys))
-
             else:
                 peak_weights = np.linspace(0.7, 1.0, len(recent_peaks))
                 valley_weights = np.linspace(0.7, 1.0, len(recent_valleys))
@@ -90,7 +82,6 @@ class Backtester:
                 self.position = self.capital / current_price
                 self.capital = 0
                 self.trades.append(("BUY", current_price, i))
-
             elif avg_peak and current_price > avg_peak and self.position > 0:
                 self.capital = self.position * current_price
                 self.position = 0
@@ -101,12 +92,11 @@ class Backtester:
 
         self.equity_curve = equity_curve
         self.final_value = equity_curve[-1] if equity_curve else self.initial_capital
-
         return self.results()
+
 
     def results(self):
         returns = np.diff(self.equity_curve) / self.equity_curve[:-1]
-
         total_return = (self.final_value - self.initial_capital) / self.initial_capital
         win_trades = 0
         total_trades = len(self.trades) // 2
@@ -118,7 +108,6 @@ class Backtester:
                 win_trades += 1
 
         win_rate = win_trades / total_trades if total_trades > 0 else 0
-
         max_drawdown = 0
         peak = self.equity_curve[0]
 
@@ -128,7 +117,6 @@ class Backtester:
             dd = (peak - value) / peak
             if dd > max_drawdown:
                 max_drawdown = dd
-
         sharpe = np.mean(returns) / np.std(returns) if np.std(returns) != 0 else 0
 
         return {

@@ -13,7 +13,7 @@ from src.config.paths import BASE_DIR
 
 
 # ---------------------------
-# ⚙️ CONFIG
+# CONFIG
 # ---------------------------
 load_dotenv()
 
@@ -27,7 +27,7 @@ os.makedirs(CHARTS_DIR, exist_ok=True)
 
 
 # ---------------------------
-# 🚀 FUNCIÓN PRINCIPAL
+# FUNCIÓN PRINCIPAL
 # ---------------------------
 def run():
 
@@ -41,7 +41,7 @@ def run():
     notifier.send_message(separator_message)
 
     # ---------------------------
-    # ⏱ TIMEFRAMES
+    # TIMEFRAMES
     # ---------------------------
     timeframes = [
         ("Semana", "1 Semana", 0.01),
@@ -64,7 +64,7 @@ def run():
                 )
 
                 # ---------------------------
-                # 📊 EXTRAER DATOS
+                # EXTRAER DATOS
                 # ---------------------------
                 df = data["df"]
                 trend = data["trend"]
@@ -85,13 +85,27 @@ def run():
                 score = signal_data["score"]
 
                 # ---------------------------
-                # 🎯 CONDICIONES
+                # CONDICIONES ESTRICTAS
                 # ---------------------------
-                buy_signal = signal in ["BUY", "STRONG BUY"]
-                sell_signal = signal in ["SELL", "STRONG SELL"]
+
+                buy_signal = (
+                    avg_valley is not None and
+                    price < avg_valley and
+                    trend == "Bearish" and
+                    signal in ["BUY", "STRONG BUY"] and
+                    vwap > price
+                )
+
+                sell_signal = (
+                    avg_peak is not None and
+                    price > avg_peak and
+                    trend == "Bullish" and
+                    signal in ["SELL", "STRONG SELL"] and
+                    vwap < price
+                )
 
                 # ---------------------------
-                # 🧾 MENSAJE
+                # MENSAJE
                 # ---------------------------
                 message = build_signal_message(
                     f"{SYMBOL} ({label})",
@@ -108,7 +122,7 @@ def run():
                 )
 
                 # ---------------------------
-                # 📊 GRÁFICA
+                # GRÁFICA
                 # ---------------------------
                 fig = build_chart(df, avg_peak, avg_valley, trend)
 
@@ -120,7 +134,7 @@ def run():
                 fig.write_image(image_path)
 
                 # ---------------------------
-                # 📤 ENVÍO
+                # ENVÍO
                 # ---------------------------
                 if buy_signal or sell_signal:
 
@@ -144,7 +158,7 @@ def run():
                     print(f"⏭️ {SYMBOL} ({label}) sin señal")
 
                 # ---------------------------
-                # 🧹 LIMPIAR IMAGEN
+                # LIMPIAR IMAGEN
                 # ---------------------------
                 if os.path.exists(image_path):
                     os.remove(image_path)
