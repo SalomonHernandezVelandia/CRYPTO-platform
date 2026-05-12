@@ -1,50 +1,43 @@
-def compute_signal(
-    price,
-    vwap,
-    trend,
-    funding,
-    imbalance,
-    avg_valley,
-    avg_peak,
-    market_context=None   # 👈 nuevo
-):
+def compute_signal(price, vwap, trend, momentum, funding, imbalance, avg_valley, avg_peak, market_context=None):
     score = 0
 
     # ---------------------------
-    # 📉 Precio vs VWAP
-    # ---------------------------
+    # Precio vs VWAP
     if price < vwap:
         score += 1
     else:
         score -= 1
 
     # ---------------------------
-    # 📊 Trend
-    # ---------------------------
-    if trend == "bullish":
+    # Trend
+    if trend == "Bullish":
         score += 1
     else:
         score -= 1
 
     # ---------------------------
-    # 💰 Funding
+    # Momentum EMA
+    if momentum == "Bullish":
+        score += 1
+    else:
+        score -= 1
+
     # ---------------------------
+    # Funding
     if funding < 0:
         score += 1
     elif funding > 0:
         score -= 1
 
     # ---------------------------
-    # 📚 Order Book
-    # ---------------------------
+    # Order Book
     if imbalance > 0.55:
         score += 1
     elif imbalance < 0.45:
         score -= 1
 
     # ---------------------------
-    # 📍 Posición en rango
-    # ---------------------------
+    # Posición en rango
     if avg_valley is not None and price <= avg_valley:
         score += 2
     elif avg_peak is not None and price >= avg_peak:
@@ -54,8 +47,7 @@ def compute_signal(
         score *= 0.8
 
     # ---------------------------
-    # 🎯 Interpretación
-    # ---------------------------
+    # Interpretación
     if score >= 3:
         signal = "STRONG BUY"
     elif score >= 1:

@@ -19,9 +19,10 @@ class Backtester:
 
     def compute_context(self):
         df = self.df
-        df["ma_20"] = df["close"].rolling(20).mean()
-        df["ma_50"] = df["close"].rolling(50).mean()
-        df["trend"] = np.where(df["ma_20"] > df["ma_50"], "bullish", "bearish")
+        df["ema_13"] = df["close"].ewm(span=13, adjust=False).mean()
+        df["ema_48"] = df["close"].ewm(span=48, adjust=False).mean()
+        df["ema_200"] = df["close"].ewm(span=200, adjust=False).mean()
+        df["trend"] = np.where(df["ema_48"] > df["ema_200"], "bullish", "bearish")
         df["volatility"] = df["close"].rolling(20).std()
         df["range"] = df["high"].rolling(20).max() - df["low"].rolling(20).min()
         return df
@@ -40,8 +41,15 @@ class Backtester:
 
     def run(self):
         df = self.compute_context()
+        if len(df) < 50:
+            self.equity_curve = []
+            self.final_value = self.initial_capital
+            return self.results()
         equity_curve = []
-        for i in range(50, len(df)):
+
+        warmup = 220
+
+        for i in range(warmup, len(df)):
             window = df.iloc[:i]
             current_price = df["close"].iloc[i]
             row = df.iloc[i]
@@ -96,7 +104,21 @@ class Backtester:
 
 
     def results(self):
+        if len(self.equity_curve) == 0:
+            return {
+                "final_value": self.initial_capital,
+                "total_return": 0,
+                "win_rate": 0,
+                "max_drawdown": 0,
+                "sharpe_ratio": 0,
+                "total_trades": 0
+            }
+
         returns = np.diff(self.equity_curve) / self.equity_curve[:-1]
+        if len(returns) == 0:
+            sharpe = 0
+        else:
+            sharpe = np.mean(returns) / np.std(returns) if np.std(returns) != 0 else 0
         total_return = (self.final_value - self.initial_capital) / self.initial_capital
         win_trades = 0
         total_trades = len(self.trades) // 2

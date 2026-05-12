@@ -1,38 +1,28 @@
-import streamlit as st
+import streamlit as st                                                      # Streamlit es el framework que convierte Python en una app web interactiva.
 import pandas as pd
 import os
-import plotly.graph_objects as go
-import numpy as np
 
-from src.api.binance.client import get_order_book
 from src.config.settings import SYMBOLS, TRADES
 from src.config.paths import BASE_DIR, DATA_PATH
 
 from analytics.backtesting.service import run_backtest
-from analytics.signals.signal_engine import compute_signal
-from analytics.indicators.market_indicators import add_indicators
-from analytics.indicators.swings import get_trade_swings, extract_swing_points
-from analytics.indicators.weighted_levels import compute_weighted_levels
-from analytics.indicators.orderbook import normalize_orderbook, compute_orderbook_metrics, compute_depth
 from analytics.pipeline import run_pipeline
-from analytics.signals.market_context import get_market_context, get_funding_bias
 from analytics.chart.plotters import plot_price_chart, plot_orderbook_chart
 
+st.set_page_config(layout="wide")                                           # Hace app más ancha                       
 
-
-st.set_page_config(layout="wide")           # Hacer app más ancha                       
 
 
 # -------------------------------
 # Cargar datos
 # -------------------------------
-@st.cache_data
+@st.cache_data                                                              # Le dice a streamlit "No recalcules esto cada vez"
 def load_funding(symbol):
     file_path = os.path.join(DATA_PATH, "funding_rate", f"{symbol}.csv")
 
     if not os.path.exists(file_path):
         return None
-
+    
     df = pd.read_csv(file_path)
     df["time"] = pd.to_datetime(df["time"])
     df = df.set_index("time")
@@ -40,38 +30,47 @@ def load_funding(symbol):
     return df
 
 
+
 # -------------------------------
 # UI
 # -------------------------------
-st.title("📊 Crypto Dashboard")
+st.title("📊 Crypto Dashboard")                                         # Titulo del dashboard
 
-col1, col2, col3, col4 = st.columns([1,1,1,1.2])
+col1, col2, col3, col4 = st.columns([1,1,1,1.2])                        # Divide la pantalla horizontalmente.
 
 with col1:
-    symbol = st.selectbox("Crypto", SYMBOLS)
+    symbol = st.selectbox("Crypto", SYMBOLS)                            # Permite elegir la Cryptomoneda
 with col2:
-    interval = st.radio(
+    interval = st.radio(                                                # Botones para timeframe.
         "Intervalo",
-        ["1H", "Diario", "Semanal", "Mensual", "Anual"]
+        ["15M", "1H", "4H", "Diario", "Semanal", "Mensual", "Anual"],
+        index=1                                                         # Define el seleccionado por defecto (1H)
     )
-with col3:
+with col3:                                                              # Controla cuánto histórico mostrar.
     range_option = st.radio(
         "Rango",
-        ["1 Mes", "1 Semana", "1 Año", "Todo"],
+        ["1 Semana", "1 Mes", "1 Año", "Todo"],
         index=0
     )
 with col4:
-    prominence = st.slider("Sensibilidad", 0.01, 0.2, 0.05)
+    prominence = st.slider("Sensibilidad", 0.01, 0.2, 0.01)             # Controla sensibilidad swings.
     window_swings = st.slider("Ventana", 5, 30, 10)
+
 
 
 # -------------------------------
 # Procesamiento
 # -------------------------------
-data = run_pipeline(symbol=symbol, interval=interval, range_option=range_option, prominence=prominence, window_swings=window_swings)
+data = run_pipeline(symbol=symbol, interval=interval, range_option=range_option, prominence=prominence, window_swings=window_swings) # Ejecuta todo
 df = data["df"]
 signal_data = data["signal"]
 current_trend = data["trend"]
+momentum = df["momentum"].iloc[-1]                                                      # .iloc[-1] = Ultima fila
+
+if momentum == "Bullish":
+    st.markdown("<p style='color:lime;'>Momentum Alcista</p>", unsafe_allow_html=True)
+else:
+    st.markdown("<p style='color:red;'>Momentum Bajista</p>", unsafe_allow_html=True)
 market_context = data["context"]
 current_funding = data["funding"]
 ob_metrics = data["orderbook"]
@@ -83,20 +82,18 @@ signal = signal_data["signal"]
 score = signal_data["score"]
 
 
+
 # -------------------------------
 # BACKTESTING
-# -------------------------------
-results = run_backtest(df)
-
+results = run_backtest(df)                                                              # Ejecuta simulación histórica, devolviendo retorno, sharpe, drawdown, etc
 
 
 # -------------------------------
 # Métricas
-# -------------------------------
-col1, col2, col3, col4 = st.columns(4)
-trend_label = "📈" if current_trend == "Bullish" else "📉"
+col1, col2, col3, col4 = st.columns(4)                                                  # Nuevas columnas
+trend_label = "📈" if current_trend == "Bullish" else "📉"                             # Solo para definir emoji segun tendencia
 
-valor_valley = f"{avg_valley:.6f} {trend_label}" if avg_valley else "N/A"
+valor_valley = f"{avg_valley:.6f} {trend_label}" if avg_valley else "N/A"               # Solo para definir el formato de texto
 valor_peak = f"{avg_peak:.6f} {trend_label}" if avg_peak else "N/A"
 # 🟥 COMPRA
 with col1:
@@ -126,7 +123,6 @@ with col4:
 
 # -------------------------------
 # RESULTADOS BACKTESTING
-# -------------------------------
 col1, col2, col3, col4, col5 = st.columns(5)
 
 with col1:
@@ -151,12 +147,14 @@ elif signal == "STRONG SELL":
 else:
     st.write(f"⚪ HOLD (Score: {score})")
 
+
+
 # -------------------------------
 # GRÁFICA
 # -------------------------------
-st.subheader(f"{symbol} - {interval}")
+st.subheader(f"{symbol} - {interval}")                              # Título gráfica.
 
-fig = plot_price_chart(
+fig = plot_price_chart(                                             # Realiza la grafica en plotters
     df=df,
     peak_x=peak_x,
     peak_y=peak_y,
@@ -165,10 +163,10 @@ fig = plot_price_chart(
     avg_peak=avg_peak,
     avg_valley=avg_valley,
     trades=TRADES.get(symbol, []),
-    trend=current_trend
+    trend=current_trend,
+    signal=signal
 )
-st.plotly_chart(fig, use_container_width=True)
-# fig.write_image("chart.png")
+st.plotly_chart(fig, use_container_width=True)                      # Renderiza gráfica interactiva. Usa todo el ancho
 
 st.subheader("📊 Order Book Depth")
 fig_ob = plot_orderbook_chart(bid_prices,bid_qty,ask_prices,ask_qty)

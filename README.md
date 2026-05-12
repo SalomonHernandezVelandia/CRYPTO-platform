@@ -374,8 +374,6 @@ python -m streamlit run app/dashboard.py
 
 python -m jobs.fetch_binance_data
 
-python -m jobs.run_signal
-
 
 1. 📊 Históricos (CSV)
 OHLCV

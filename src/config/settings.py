@@ -1,9 +1,9 @@
 SYMBOLS = [
     "BTCUSDT", "ETHUSDT", "XRPUSDT", "SOLUSDT", "DOGEUSDT", "ADAUSDT", "LINKUSDT", 
-    "XLMUSDT", "XMRUSDT", "AVAXUSDT", "HBARUSDT", "SHIBUSDT", "PEPEUSDT"
+    # "XLMUSDT", "XMRUSDT", "AVAXUSDT", "HBARUSDT", "SHIBUSDT", "PEPEUSDT"
 ]
 
-INTERVAL = "1h"                     # 1m, 5m, 15m, 1h, 4h, 1d, 1w, 1M
+INTERVAL = "15m"                     # 1m, 5m, 15m, 1h, 4h, 1d, 1w, 1M
 
 START_DATE = "2017-01-01"
 

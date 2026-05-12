@@ -13,7 +13,7 @@ from analytics.signals.signal_engine import compute_signal
 
 
 # -------------------------------
-# DATA LOADING
+# DATA LOADING    
 # -------------------------------
 def load_data(symbol):
     file_path = os.path.join(DATA_PATH, f"{symbol}.csv")
@@ -26,9 +26,9 @@ def load_data(symbol):
     return df
 
 
+# Carga CSV de funding.
 def load_funding(symbol):
     file_path = os.path.join(DATA_PATH, "funding_rate", f"{symbol}.csv")
-
     if not os.path.exists(file_path):
         return None
 
@@ -39,22 +39,27 @@ def load_funding(symbol):
     return df
 
 
+
 # -------------------------------
 # TRANSFORMATIONS
-# -------------------------------
 def resample_data(df, interval):
-    if interval == "1H":
+    if interval == "15M":           # 15M = datos originales
         return df
 
     rule_map = {
+        "1H": "1h",
+        "4H": "4h",
         "Diario": "D",
         "Semanal": "W",
         "Mensual": "M",
         "Anual": "Y"
     }
-    rule = rule_map.get(interval)
+    rule = rule_map.get(interval)   # Obtener regla
 
-    return df.resample(rule).agg({
+    if rule is None:                # Proteccion si no existe
+        return df
+
+    df = df.resample(rule).agg({    # Agrupa las velas segun el intervalo
         "open": "first",
         "high": "max",
         "low": "min",
@@ -62,10 +67,15 @@ def resample_data(df, interval):
         "volume": "sum",
         "fundingRate": "mean"
     })
+    df = df.dropna()                # Elimina velas incompletas, evita velas corruptas
+
+    return df
 
 
+# -------------------------------
+# FILTRA RANGO TEMPORAL
 def filter_by_range(df, range_option):
-    end_date = df.index.max()
+    end_date = df.index.max()                           # Ultima fecha
 
     if range_option == "1 Semana":
         start_date = end_date - pd.Timedelta(days=7)
@@ -79,6 +89,7 @@ def filter_by_range(df, range_option):
     return df[df.index >= start_date]
 
 
+
 # -------------------------------
 # MAIN PIPELINE
 # -------------------------------
@@ -88,16 +99,18 @@ def run_pipeline(symbol, interval, range_option, prominence, window_swings):
     funding_df = load_funding(symbol)
 
     if funding_df is not None:
-        df = df.merge(funding_df, left_index=True, right_index=True, how="left")
-        df["fundingRate"] = df["fundingRate"].ffill()
+        df = df.merge(funding_df, left_index=True, right_index=True, how="left")    # El merge() une funding con velas 
+        df["fundingRate"] = df["fundingRate"].ffill()                               # Funding no cambia cada vela, entonces rellena espacios.
 
     # 2. Transform
-    df = filter_by_range(df, range_option)
-    df = resample_data(df, interval)
+    df = filter_by_range(df, range_option)                                          # Filtra el tiempo
+    df = resample_data(df, interval)                                                # Transforma el time_frame
 
     # 3. Indicators
-    df = add_indicators(df)
+    df = add_indicators(df)                                                         # Agrega EMA, VWAP, volatilidad, momentum
+    # NUEVAS VARIABLES (EMA)
     current_trend = df["trend"].iloc[-1]
+    current_momentum = df["momentum"].iloc[-1]
     market_context = get_market_context(df)
 
     # 4. Orderbook
@@ -132,10 +145,12 @@ def run_pipeline(symbol, interval, range_option, prominence, window_swings):
         price=price,
         vwap=df["vwap"].iloc[-1],
         trend=current_trend,
+        momentum=current_momentum,
         funding=current_funding,
         imbalance=ob_metrics["imbalance"],
         avg_valley=avg_valley,
-        avg_peak=avg_peak
+        avg_peak=avg_peak,
+        market_context=market_context
     )
 
     return {
