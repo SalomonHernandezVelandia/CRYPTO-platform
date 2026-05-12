@@ -80,22 +80,77 @@ def plot_price_chart(df, peak_x, peak_y, valley_x, valley_y, avg_peak, avg_valle
     fig.add_trace(go.Scatter(x=valley_x, y=valley_y, mode='markers', marker=dict(color='red'), name='Compra'))
 
     # Trades
+    first_trade = True
+    USER_COLORS = {
+        "SALOMON": "#FFD700",   # dorado brillante
+        "LAURA": "#C77DFF",     # morado brillante
+    }
+
     for trade in trades:
         trade_date = pd.to_datetime(trade["date"])
         trade_price = trade["price"]
+        trade_user = trade.get("user", "USER")
 
         if trade_date < df.index.min() or trade_date > df.index.max():
             continue
 
+        # =========================
+        # COLOR SEGÚN USUARIO
+        # =========================
+        trade_color = USER_COLORS.get(
+            trade_user.upper(),
+            "#00E5FF"   # color default si aparece otro usuario
+        )
+
         fig.add_trace(go.Scatter(
             x=[trade_date],
             y=[trade_price],
-            mode='markers',
-            marker=dict(color='purple', size=12),
-            name='Entrada'
+
+            mode='markers+text',
+
+            text=[trade_user],
+            textposition="top center",
+
+            marker=dict(
+                color=trade_color,
+                size=18,
+
+                line=dict(
+                    color='white',
+                    width=2
+                ),
+
+                symbol='diamond'
+            ),
+
+            textfont=dict(
+                color=trade_color,
+                size=12
+            ),
+
+            name='Entradas',
+            showlegend=first_trade
         ))
-        fig.add_vline(x=trade_date, line_dash="dash", line_color="purple")          # Marca momento exacto.
-        fig.add_hline(y=trade_price, line_dash="dot", line_color="purple")          # Marca precio exacto.
+
+        first_trade = False
+
+        # Línea vertical
+        fig.add_vline(
+            x=trade_date,
+            line_dash="dash",
+            line_color=trade_color,
+            line_width=2,
+            opacity=0.9
+        )
+
+        # Línea horizontal
+        fig.add_hline(
+            y=trade_price,
+            line_dash="dot",
+            line_color=trade_color,
+            line_width=2,
+            opacity=0.8
+        )
 
     # Funding
     if show_funding and "fundingRate" in df.columns:

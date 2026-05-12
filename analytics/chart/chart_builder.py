@@ -1,6 +1,6 @@
 from analytics.chart.plotters import plot_price_chart
 
-def build_chart(df, avg_peak, avg_valley, trend, signal):
+def build_chart(df, avg_peak, avg_valley, trend, signal, trades=None):
     fig = plot_price_chart(
         df=df,
         peak_x=[],
@@ -9,7 +9,7 @@ def build_chart(df, avg_peak, avg_valley, trend, signal):
         valley_y=[],
         avg_peak=avg_peak,
         avg_valley=avg_valley,
-        trades=[],
+        trades=trades or [],
         trend=trend,
         signal=signal,
         show_funding=False

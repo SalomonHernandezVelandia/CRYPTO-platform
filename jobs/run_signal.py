@@ -10,6 +10,7 @@ from analytics.pipeline import run_pipeline
 
 from src.config.settings import SYMBOLS
 from src.config.paths import BASE_DIR
+from data.portfolio.storage import load_active_positions
 
 
 # ---------------------------
@@ -32,6 +33,21 @@ os.makedirs(CHARTS_DIR, exist_ok=True)
 # ---------------------------
 def run():
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")              # Obtiene la fecha
+
+    # =========================
+    # MONEDAS ACTIVAS PORTFOLIO
+    # =========================
+    positions = load_active_positions()
+
+    portfolio_symbols = set()
+
+    for user, user_positions in positions.items():
+
+        for symbol in user_positions.keys():
+
+            portfolio_symbols.add(symbol)
+
+    print("Portfolio symbols:", portfolio_symbols)
   
     # Construye un mensaje separador.
     separator_message = f"""
@@ -115,10 +131,31 @@ def run():
                     }
                 )
 
+                # =========================
+                # TRADES ACTIVOS DEL SYMBOL
+                symbol_trades = []
+                for username, user_positions in positions.items():
+                    if SYMBOL not in user_positions:
+                        continue
+                    # COLOR SEGÚN USUARIO
+                    if username.upper() == "SALOMON":
+                        trade_color = "#FFD700"   # dorado brillante
+                    else:
+                        trade_color = "#C77DFF"   # morado claro
+
+                    for trade in user_positions[SYMBOL]:
+
+                        symbol_trades.append({
+                            "date": trade["entry_date"],
+                            "price": trade["entry_price"],
+                            "user": username,
+                            "color": trade_color
+                        })
+                        
                 # ---------------------------
                 # GRÁFICA
                 # ---------------------------
-                fig = build_chart(df, avg_peak, avg_valley, trend, signal)      # Crea figura Plotly.
+                fig = build_chart(df=df,avg_peak=avg_peak,avg_valley=avg_valley,trend=trend,signal=signal,trades=symbol_trades) # Crea figura Plotly.
                 image_path = os.path.join(CHARTS_DIR, f"{SYMBOL}_{label}.png")  # Ruta de la imagen
                 fig.write_image(image_path, width=1600, height=900, scale=2)    # Guarda la imagen, exporta la grafica
 
@@ -126,11 +163,15 @@ def run():
                 # ---------------------------
                 # ENVÍO
                 # ---------------------------
-                if buy_signal or sell_signal:
+                always_send = SYMBOL in portfolio_symbols
+
+                if buy_signal or sell_signal or always_send:
                     if buy_signal:
                         action_text = "🟢 ===== COMPRAR ===== 🟢"
-                    else:
+                    elif sell_signal:
                         action_text = "🔴 ===== VENDER ===== 🔴"
+                    else:
+                        action_text = "📂 ===== PORTFOLIO TRACKING ===== 📂"
 
                     final_message = (
                         f"{message}\n"

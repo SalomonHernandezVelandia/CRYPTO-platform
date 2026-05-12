@@ -2,7 +2,8 @@ import streamlit as st                                                      # St
 import pandas as pd
 import os
 
-from src.config.settings import SYMBOLS, TRADES
+from src.config.settings import SYMBOLS
+from data.portfolio.storage import get_all_trades_for_symbol
 from src.config.paths import BASE_DIR, DATA_PATH
 
 from analytics.backtesting.service import run_backtest
@@ -162,7 +163,7 @@ fig = plot_price_chart(                                             # Realiza la
     valley_y=valley_y,
     avg_peak=avg_peak,
     avg_valley=avg_valley,
-    trades=TRADES.get(symbol, []),
+    trades=get_all_trades_for_symbol(symbol),
     trend=current_trend,
     signal=signal
 )

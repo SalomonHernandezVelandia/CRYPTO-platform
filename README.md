@@ -313,6 +313,7 @@ CRYPTO-platform/
 │
 ├── alerts/
 │   ├── telegram/
+│   │   ├── listener.py                 # Recibe comandos de Telegram, interfaz del bot
 │   │   └── notifier.py                 # Envía mensajes a Telegram, Usa API de Telegram
 │   └── manager.py                      # Construye el mensaje, Formatea texto bonito para Telegram
 │
@@ -338,7 +339,12 @@ CRYPTO-platform/
 │   └── dashboard.py                    # Interfaz visual (Streamlit)         
 │
 ├── data/
-│   ├── features/                   
+│   ├── features/ 
+│   ├── portfolio/  
+│   │   ├── active_positions.json   
+│   │   ├── manager.py     
+│   │   ├── storage.py                  # Guarda y carga datos JSON, acceso a datos, persistencia
+│   │   └── trade_history.json                 
 │   ├── processed/                      # Datos limpios
 │   └── raw/  
 │       └── binance /
@@ -351,7 +357,9 @@ CRYPTO-platform/
 │
 ├── jobs/
 │   ├── fetch_binance_data.py           # Descarga datos de Binance, solo descarga datos nuevos, evita duplicados
-│   └── run_signals.py                  # Sistema en vivo, es el bot trader
+│   ├── run_faser_alert.py              # Revisa movimientos rapidos, detecta velas enormes y volatilidad, manda alertas instantaneas.
+│   ├── run_signals.py                  # Sistema en vivo, es el bot trader
+│   └── scheduler.py                    # Automatizador total, cerebro de horarios para diferentes acciones de run.
 │
 ├── processing/
 │   └── cleaning/
@@ -373,6 +381,11 @@ cd "G:\PYTHON\Proyectos Personales\CRYPTO-platform"
 python -m streamlit run app/dashboard.py
 
 python -m jobs.fetch_binance_data
+
+python -m jobs.scheduler
+
+
+python -m alerts.telegram.listener
 
 
 1. 📊 Históricos (CSV)
