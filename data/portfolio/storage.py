@@ -26,7 +26,6 @@ HISTORY_FILE = os.path.join(
 # ACTIVE POSITIONS
 # =========================
 def load_active_positions():
-
     if not os.path.exists(ACTIVE_FILE):
         return {}
 
@@ -34,8 +33,8 @@ def load_active_positions():
         return json.load(f)
 
 
-def save_active_positions(data):
 
+def save_active_positions(data):
     with open(ACTIVE_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
@@ -44,7 +43,6 @@ def save_active_positions(data):
 # TRADE HISTORY
 # =========================
 def load_trade_history():
-
     if not os.path.exists(HISTORY_FILE):
         return []
 
@@ -52,28 +50,24 @@ def load_trade_history():
         return json.load(f)
 
 
-def save_trade_history(data):
 
+def save_trade_history(data):
     with open(HISTORY_FILE, "w") as f:
         json.dump(data, f, indent=4)
+
 
 
 # =========================
 # DASHBOARD TRADES
 # =========================
 def get_all_trades_for_symbol(symbol):
-
     positions = load_active_positions()
-
     trades = []
-
     for user, user_positions in positions.items():
-
         if symbol not in user_positions:
             continue
 
         for trade in user_positions[symbol]:
-
             trades.append({
                 "user": user,
                 "date": trade["entry_date"],

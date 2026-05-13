@@ -1,69 +1,73 @@
 from analytics.pipeline import run_pipeline
-from alerts.telegram.notifier import TelegramNotifier
+from analytics.signals.rapid_reversal import detect_rapid_reversal
 
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-
-notifier = TelegramNotifier(TOKEN, CHAT_ID)
-
-SYMBOLS = [
-    "BTCUSDT",
-    "ETHUSDT",
-    "SOLUSDT",
-]
+from src.config.settings import SYMBOLS
+from src.api.telegram.client import send_message
 
 
+TIMEFRAMES = ["15m", "1h"]
+
+
+# ==========================================
+# FAST ALERTS
+# ==========================================
 def run_fast_alerts():
+    print("⚡ Ejecutando fast alerts...")
+    alerts_found = 0
 
     for symbol in SYMBOLS:
+        # RECORRER TEMPORALIDADES
+        for timeframe in TIMEFRAMES:
+            try:
+                data = run_pipeline(
+                    symbol=symbol,
+                    interval=timeframe,
+                    range_option="1 Semana",
+                    prominence=0.01,
+                    window_swings=10
+                )
+                df = data["df"]
+                trend = data["trend"]
 
-        try:
+                # DETECTAR PATRONES
+                rapid_signal = detect_rapid_reversal(df, trend)
+                if rapid_signal is None:
+                    continue
 
-            data = run_pipeline(
-                symbol=symbol,
-                interval="15M",
-                range_option="1 Semana",
-                prominence=0.01,
-                window_swings=10
-            )
+                alerts_found += 1
 
-            df = data["df"]
-
-            last_candle = df.iloc[-1]
-            prev_candle = df.iloc[-2]
-
-            last_size = abs(last_candle["close"] - last_candle["open"])
-            prev_size = abs(prev_candle["close"] - prev_candle["open"])
-
-            # ==================================
-            # MOVIMIENTO FUERTE
-            # ==================================
-            if prev_size > 0 and last_size >= prev_size * 3:
-
-                direction = "🟢 FUERTE SUBIDA" if (
-                    last_candle["close"] > last_candle["open"]
-                ) else "🔴 FUERTE CAÍDA"
-
-                pct = (
-                    abs(last_candle["close"] - last_candle["open"])
-                    / last_candle["open"]
-                ) * 100
-
-                message = (
-                    f"{direction}\n\n"
-                    f"🪙 {symbol}\n"
-                    f"📊 Movimiento: {pct:.2f}%\n"
-                    f"⏰ Vela 15M explosiva"
+                # MENSAJE
+                title = rapid_signal.get(
+                    "message",
+                    "⚠️ POSIBLE CAMBIO DE TENDENCIA"
                 )
 
-                notifier.send_message(message)
+                message = (
+                    f"{title}\n\n"
+                    f"🪙 {symbol}\n"
+                    f"⏰ Temporalidad: {timeframe}\n"
+                    f"📈 Movimiento: "
+                    f"{rapid_signal['movement']:.2f}%\n"
+                    f"🔥 Explosividad: "
+                    f"{rapid_signal['explosive']}\n"
+                    f"🧠 Patrón: "
+                    f"{rapid_signal['pattern']}"
+                )
+                send_message(text=message)
+                print(
+                    f"✅ Fast alert enviada: "
+                    f"{symbol} {timeframe}"
+                )
 
-                print(f"ALERTA {symbol}")
+            except Exception as e:
+                print(
+                    f"❌ Fast alert error "
+                    f"{symbol} {timeframe}: {e}"
+                )
 
-        except Exception as e:
-            print(f"Fast alert error {symbol}: {e}")
+
+    # ======================================
+    # NO HUBO ALERTAS
+    # ======================================
+    if alerts_found == 0:
+        print("⚠️ Sin alertas rápidas en esta ronda")

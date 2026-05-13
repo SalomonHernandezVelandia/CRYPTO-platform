@@ -19,7 +19,10 @@ def load_data(symbol):
     file_path = os.path.join(DATA_PATH, f"{symbol}.csv")
     df = pd.read_csv(file_path)
 
-    df["open_time"] = pd.to_datetime(df["open_time"])
+    df["open_time"] = (
+        pd.to_datetime(df["open_time"])
+        - pd.Timedelta(hours=5)
+    )
     df = df.sort_values("open_time")
     df = df.set_index("open_time")
 
@@ -33,7 +36,10 @@ def load_funding(symbol):
         return None
 
     df = pd.read_csv(file_path)
-    df["time"] = pd.to_datetime(df["time"])
+    df["time"] = (
+        pd.to_datetime(df["time"])
+        - pd.Timedelta(hours=5)
+    )
     df = df.set_index("time")
 
     return df
@@ -101,22 +107,25 @@ def filter_by_range(df, range_option):
 # -------------------------------
 # MAIN PIPELINE
 # -------------------------------
-def run_pipeline(symbol, interval, range_option, prominence, window_swings):
+def run_pipeline(symbol, interval, range_option, prominence, window_swings, mode="dashboard"):
     # 1. Data
     df = load_data(symbol)
     funding_df = load_funding(symbol)
 
+    # LIMITADOR ALERTS
+    if mode == "alerts":
+        cutoff = (df.index.max() - pd.Timedelta(days=35))
+        df = df[df.index >= cutoff]
+
     if funding_df is not None and not funding_df.empty:
         # Validar columna fundingRate
         if "fundingRate" in funding_df.columns:
-
             df = df.merge(
                 funding_df,
                 left_index=True,
                 right_index=True,
                 how="left"
             )
-
             df["fundingRate"] = df["fundingRate"].ffill()
 
     # 2. Transform

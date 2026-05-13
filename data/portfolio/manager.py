@@ -1,24 +1,14 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 
-from data.portfolio.storage import (
-    load_active_positions,
-    save_active_positions,
-    load_trade_history,
-    save_trade_history
-)
+from data.portfolio.storage import load_active_positions, save_active_positions, load_trade_history, save_trade_history
 
 
-def add_position(
-    user,
-    symbol,
-    usdt_invested,
-    entry_price,
-    entry_date=None
-):
 
+def add_position(user, symbol, usdt_invested, entry_price, entry_date=None):
     if entry_date is None:
-        entry_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        colombia_time = datetime.utcnow() - timedelta(hours=5)
+        entry_date = colombia_time.strftime("%Y-%m-%d %H:%M:%S")
 
     coin_amount = usdt_invested / entry_price
 
@@ -52,15 +42,10 @@ def add_position(
 
 
 
-def sell_position(
-    user,
-    symbol,
-    exit_price,
-    exit_date=None
-):
-
+def sell_position(user, symbol, exit_price, exit_date=None):
     if exit_date is None:
-        exit_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        colombia_time = datetime.utcnow() - timedelta(hours=5)
+        exit_date = colombia_time.strftime("%Y-%m-%d %H:%M:%S")
 
     positions = load_active_positions()
 
@@ -144,7 +129,6 @@ def sell_position(
 
 
 def get_trade_history(user=None):
-
     history = load_trade_history()
 
     # =========================

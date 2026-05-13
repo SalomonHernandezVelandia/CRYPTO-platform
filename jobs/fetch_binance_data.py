@@ -55,10 +55,10 @@ def main():
         else:
             print(f"{symbol} funding actualizado")
 
-    # ===================================================================================
-    # Después de actualizar todo, calcula indicadores, genera señales, envia a Telegram.
-    from jobs.run_signal import run
-    run()
+    # # ===================================================================================
+    # # Después de actualizar todo, calcula indicadores, genera señales, envia a Telegram.
+    # from jobs.run_signal import run
+    # run()
 
 
 

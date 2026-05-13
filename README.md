@@ -313,6 +313,13 @@ CRYPTO-platform/
 │
 ├── alerts/
 │   ├── telegram/
+│   │   ├── commands/
+│   │   │   ├── add_command.py
+│   │   │   ├── history_command.py
+│   │   │   ├── portfolio_command.py
+│   │   │   ├── request_command.py
+│   │   │   ├── sell_command.py
+│   │   │   └── stats_command.py
 │   │   ├── listener.py                 # Recibe comandos de Telegram, interfaz del bot
 │   │   └── notifier.py                 # Envía mensajes a Telegram, Usa API de Telegram
 │   └── manager.py                      # Construye el mensaje, Formatea texto bonito para Telegram
@@ -332,6 +339,7 @@ CRYPTO-platform/
 │   │   └── weighted_levels.py          # Calcula niveles inteligentes
 │   ├── signals/                
 │   │   ├── signal_engine.py
+│   │   ├── rapid_reversal.py           # Detecta patrones de velas
 │   │   └── market_context.py           # Añade inteligencia macro
 │   └── pipeline.py                     # Este es el corazón del sistema, devuelve TODO listo para usar
 │
@@ -357,7 +365,7 @@ CRYPTO-platform/
 │
 ├── jobs/
 │   ├── fetch_binance_data.py           # Descarga datos de Binance, solo descarga datos nuevos, evita duplicados
-│   ├── run_faser_alert.py              # Revisa movimientos rapidos, detecta velas enormes y volatilidad, manda alertas instantaneas.
+│   ├── run_faser_alert.py              # Revisa movimientos rapidos y manda alertas
 │   ├── run_signals.py                  # Sistema en vivo, es el bot trader
 │   └── scheduler.py                    # Automatizador total, cerebro de horarios para diferentes acciones de run.
 │
@@ -369,6 +377,8 @@ CRYPTO-platform/
 │   ├── api/                            
 │   │   ├── binance/
 │   │   │   └── client.py               # Conecta con Binance
+│   │   ├── telegram/
+│   │   │   └── client.py               # Conecta con telegram
 │   └── config/                         
 │       ├── paths.py
 │       └── settings.py                 # Símbolos, intervalos, trades de ejemplo

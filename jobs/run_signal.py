@@ -86,20 +86,20 @@ def process_symbol(SYMBOL, force_send=False):
 
             # ---------------------------
             # CONDICIONES
+            # =========================
+            has_active_trade = SYMBOL in portfolio_symbols
+
             buy_signal = (
                 avg_valley is not None and
-                price < avg_valley and
-                trend == "Bearish" and
-                signal in ["BUY", "STRONG BUY"] and
-                vwap > price
+                price <= avg_valley and
+                signal in ["BUY", "STRONG BUY"]
             )
 
             sell_signal = (
+                has_active_trade and
                 avg_peak is not None and
-                price > avg_peak and
-                trend == "Bullish" and
-                signal in ["SELL", "STRONG SELL"] and
-                vwap < price
+                price >= avg_peak and
+                signal in ["SELL", "STRONG SELL"]
             )
 
             # ---------------------------
@@ -168,28 +168,33 @@ def process_symbol(SYMBOL, force_send=False):
             # ---------------------------
             # ENVÍO
             # ---------------------------
-            always_send = SYMBOL in portfolio_symbols
-
             should_send = (
+                has_active_trade or
                 buy_signal or
                 sell_signal or
-                always_send or
                 force_send
             )
-
             if should_send:
 
                 if buy_signal:
+
                     action_text = "🟢 ===== COMPRAR ===== 🟢"
 
                 elif sell_signal:
+
                     action_text = "🔴 ===== VENDER ===== 🔴"
 
+                elif has_active_trade:
+
+                    action_text = "📂 ===== PORTFOLIO TRACKING ===== 📂"
+
                 elif force_send:
+
                     action_text = "📂 ===== REQUEST ANALYSIS ===== 📂"
 
                 else:
-                    action_text = "📂 ===== PORTFOLIO TRACKING ===== 📂"
+
+                    action_text = "📂 ===== ANALYSIS ===== 📂"
 
                 final_message = (
                     f"{message}\n"

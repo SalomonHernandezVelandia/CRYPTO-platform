@@ -1,9 +1,43 @@
 import requests         # Libreria para hacer llamadas HTTP (API)
+import pandas as pd
 import time             # Para pausar ejecucion y evitar bloqueos de API
 
 BASE_URL = "https://api.binance.com/api/v3/klines"
 FUNDING_URL = "https://fapi.binance.com/fapi/v1/fundingRate"
 ORDERBOOK_URL = "https://api.binance.com/api/v3/depth"
+PRICE_URL = "https://api.binance.com/api/v3/ticker/price"
+
+
+
+
+# Obtiene precio ACTUAL desde Binance.
+def get_crypto_price(symbol):
+    url = f"{PRICE_URL}?symbol={symbol}"
+    response = requests.get(url).json()
+
+    return float(response["price"])         # Convierte string → número.
+
+
+
+
+# Obtener el precio histórico de entrada.
+def get_historical_price(symbol, date_string):
+    params = {                                              # Pide vela de 1h, una sola vela
+        "symbol": symbol,
+        "interval": "1h",
+        "limit": 1
+    }
+    dt = pd.to_datetime(date_string)                        # Convertir fecha a timestamp
+    timestamp = int(dt.timestamp() * 1000)                  # Binance usa milisegundos UNIX.
+    params["startTime"] = timestamp                         # dame la vela desde este momento.
+
+    response = requests.get(BASE_URL, params=params).json()
+
+    close_price = float(response[0][4])                     # Close price
+
+    return close_price
+
+
 
 
 
