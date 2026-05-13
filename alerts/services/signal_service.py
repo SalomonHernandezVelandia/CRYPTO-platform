@@ -1,10 +1,14 @@
 import os
 
 from analytics.pipeline import run_pipeline
-from alerts.manager import build_signal_message
 from analytics.chart.chart_builder import build_chart
 
+from alerts.manager import build_signal_message
+
 from src.config.paths import BASE_DIR
+
+from data.portfolio.storage import load_active_positions
+
 
 CHARTS_DIR = os.path.join(
     BASE_DIR,
@@ -16,8 +20,16 @@ CHARTS_DIR = os.path.join(
 os.makedirs(CHARTS_DIR, exist_ok=True)
 
 
-def generate_signal_data(symbol, label, range_option, prominence):
+def generate_signal_data(
+    symbol,
+    label="Semana",
+    range_option="1 Semana",
+    prominence=0.01
+):
 
+    # =========================
+    # PIPELINE
+    # =========================
     data = run_pipeline(
         symbol=symbol,
         interval="1H",
@@ -32,6 +44,7 @@ def generate_signal_data(symbol, label, range_option, prominence):
     df = data["df"]
 
     trend = data["trend"]
+
     context = data["context"]
 
     avg_peak, avg_valley = data["levels"]
@@ -55,37 +68,6 @@ def generate_signal_data(symbol, label, range_option, prominence):
     score = signal_data["score"]
 
     # =========================
-    # CONDICIONES ESTRICTAS
-    # =========================
-    buy_signal = (
-        avg_valley is not None and
-        price < avg_valley and
-        trend == "Bearish" and
-        signal in ["BUY", "STRONG BUY"] and
-        vwap > price
-    )
-
-    sell_signal = (
-        avg_peak is not None and
-        price > avg_peak and
-        trend == "Bullish" and
-        signal in ["SELL", "STRONG SELL"] and
-        vwap < price
-    )
-
-    # =========================
-    # ACTION TEXT
-    # =========================
-    if buy_signal:
-        action_text = "🟢 ===== COMPRAR ===== 🟢"
-
-    elif sell_signal:
-        action_text = "🔴 ===== VENDER ===== 🔴"
-
-    else:
-        action_text = "📂 ===== PORTFOLIO TRACKING ===== 📂"
-
-    # =========================
     # MENSAJE
     # =========================
     message = build_signal_message(
@@ -102,12 +84,31 @@ def generate_signal_data(symbol, label, range_option, prominence):
         }
     )
 
-    final_message = (
-        f"{message}\n"
-        f"{action_text}\n"
-        f"📊 Señal: {signal} (Score: {score})\n"
-        f"📚 OrderBook Imbalance: {imbalance:.2f}"
-    )
+    # =========================
+    # TRADES ACTIVOS
+    # =========================
+    positions = load_active_positions()
+
+    symbol_trades = []
+
+    for username, user_positions in positions.items():
+
+        if symbol not in user_positions:
+            continue
+
+        if username.upper() == "SALOMON":
+            trade_color = "#FFD700"
+        else:
+            trade_color = "#C77DFF"
+
+        for trade in user_positions[symbol]:
+
+            symbol_trades.append({
+                "date": trade["entry_date"],
+                "price": trade["entry_price"],
+                "user": username,
+                "color": trade_color
+            })
 
     # =========================
     # GRÁFICA
@@ -117,7 +118,8 @@ def generate_signal_data(symbol, label, range_option, prominence):
         avg_peak=avg_peak,
         avg_valley=avg_valley,
         trend=trend,
-        signal=signal
+        signal=signal,
+        trades=symbol_trades
     )
 
     image_path = os.path.join(
@@ -132,28 +134,14 @@ def generate_signal_data(symbol, label, range_option, prominence):
         scale=2
     )
 
-    # =========================
-    # CONDICIONES
-    # =========================
-    buy_signal = (
-        avg_valley is not None and
-        price < avg_valley and
-        trend == "Bearish" and
-        signal in ["BUY", "STRONG BUY"] and
-        vwap > price
-    )
-
-    sell_signal = (
-        avg_peak is not None and
-        price > avg_peak and
-        trend == "Bullish" and
-        signal in ["SELL", "STRONG SELL"] and
-        vwap < price
+    final_message = (
+        f"{message}\n"
+        f"📊 Señal: {signal} (Score: {score})\n"
+        f"📚 OrderBook Imbalance: {imbalance:.2f}"
     )
 
     return {
         "message": final_message,
         "image_path": image_path,
-        "buy_signal": buy_signal,
-        "sell_signal": sell_signal
+        "signal": signal
     }

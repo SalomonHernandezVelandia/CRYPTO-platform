@@ -27,12 +27,7 @@ CHARTS_DIR = os.path.join(BASE_DIR, "analytics", "chart", "output") # Construye 
 os.makedirs(CHARTS_DIR, exist_ok=True)
 
 
-
-# ---------------------------
-# FUNCIÓN PRINCIPAL
-# ---------------------------
-def run():
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")              # Obtiene la fecha
+def process_symbol(SYMBOL, force_send=False):
 
     # =========================
     # MONEDAS ACTIVAS PORTFOLIO
@@ -47,146 +42,196 @@ def run():
 
             portfolio_symbols.add(symbol)
 
-    print("Portfolio symbols:", portfolio_symbols)
-  
-    # Construye un mensaje separador.
-    separator_message = f"""
-━━━━━━━━━━━━━━━━━━━━━━━
-⏰ *Actualización:* {now}
-━━━━━━━━━━━━━━━━━━━━━━━
-"""
-    notifier.send_message(separator_message)
-
     # ---------------------------
     # TIMEFRAMES
+    # ---------------------------
     timeframes = [
         ("Semana", "1 Semana", 0.01),
         ("Mes", "1 Mes", 0.02),
     ]
 
-    for SYMBOL in SYMBOLS:
-        try:
-            print(f"===> Procesando {SYMBOL}")
+    try:
 
-            for label, range_option, prominence in timeframes:
-                data = run_pipeline(
-                    symbol=SYMBOL,
-                    interval="1H",
-                    range_option=range_option,
-                    prominence=prominence,
-                    window_swings=10
-                )
+        print(f"===> Procesando {SYMBOL}")
 
-                # ---------------------------
-                # EXTRAER DATOS
-                df = data["df"]                                         # DataFrame completo.
-                trend = data["trend"]                                   # Bullish o Bearish.
-                context = data["context"]
-                avg_peak, avg_valley = data["levels"]                   # Soportes y resistencias inteligentes.
-                signal_data = data["signal"]                            # Devuelve "Buy o no" y el score
-                funding = data["funding"]
+        for label, range_option, prominence in timeframes:
 
-                peak_x, peak_y, valley_x, valley_y = data["swings"]     # Para detectar soportes y resistencias
-                trades = len(peak_y) + len(valley_y)                    # Cuenta cuántos swings hubo.
+            data = run_pipeline(
+                symbol=SYMBOL,
+                interval="1H",
+                range_option=range_option,
+                prominence=prominence,
+                window_swings=10
+            )
 
-                imbalance = data["orderbook"]["imbalance"]              # Calcula presión compradora/vendedora.
+            # ---------------------------
+            # EXTRAER DATOS
+            df = data["df"]
+            trend = data["trend"]
+            context = data["context"]
+            avg_peak, avg_valley = data["levels"]
+            signal_data = data["signal"]
+            funding = data["funding"]
 
-                price = df["close"].iloc[-1]
-                vwap = df["vwap"].iloc[-1]                              # Último VWAP.
+            peak_x, peak_y, valley_x, valley_y = data["swings"]
+            trades = len(peak_y) + len(valley_y)
 
-                signal = signal_data["signal"]
-                score = signal_data["score"]
+            imbalance = data["orderbook"]["imbalance"]
 
-                # ---------------------------
-                # CONDICIONES ESTRICTAS
-                buy_signal = (
-                    avg_valley is not None and
-                    price < avg_valley and
-                    trend == "Bearish" and
-                    signal in ["BUY", "STRONG BUY"] and
-                    vwap > price
-                )
+            price = df["close"].iloc[-1]
+            vwap = df["vwap"].iloc[-1]
 
-                sell_signal = (
-                    avg_peak is not None and
-                    price > avg_peak and
-                    trend == "Bullish" and
-                    signal in ["SELL", "STRONG SELL"] and
-                    vwap < price
-                )
+            signal = signal_data["signal"]
+            score = signal_data["score"]
 
-                # ---------------------------
-                # MENSAJE
-                message = build_signal_message(
-                    f"{SYMBOL} ({label})",
-                    {
-                        "price": price,
-                        "vwap_week": vwap,
-                        "trades_week": trades,
-                        "w_peak": avg_peak,
-                        "w_valley": avg_valley,
-                        "trend": trend,
-                        "context": context,
-                        "funding": funding
-                    }
-                )
+            # ---------------------------
+            # CONDICIONES
+            buy_signal = (
+                avg_valley is not None and
+                price < avg_valley and
+                trend == "Bearish" and
+                signal in ["BUY", "STRONG BUY"] and
+                vwap > price
+            )
 
-                # =========================
-                # TRADES ACTIVOS DEL SYMBOL
-                symbol_trades = []
-                for username, user_positions in positions.items():
-                    if SYMBOL not in user_positions:
-                        continue
-                    # COLOR SEGÚN USUARIO
-                    if username.upper() == "SALOMON":
-                        trade_color = "#FFD700"   # dorado brillante
-                    else:
-                        trade_color = "#C77DFF"   # morado claro
+            sell_signal = (
+                avg_peak is not None and
+                price > avg_peak and
+                trend == "Bullish" and
+                signal in ["SELL", "STRONG SELL"] and
+                vwap < price
+            )
 
-                    for trade in user_positions[SYMBOL]:
+            # ---------------------------
+            # MENSAJE
+            message = build_signal_message(
+                f"{SYMBOL} ({label})",
+                {
+                    "price": price,
+                    "vwap_week": vwap,
+                    "trades_week": trades,
+                    "w_peak": avg_peak,
+                    "w_valley": avg_valley,
+                    "trend": trend,
+                    "context": context,
+                    "funding": funding
+                }
+            )
 
-                        symbol_trades.append({
-                            "date": trade["entry_date"],
-                            "price": trade["entry_price"],
-                            "user": username,
-                            "color": trade_color
-                        })
-                        
-                # ---------------------------
-                # GRÁFICA
-                # ---------------------------
-                fig = build_chart(df=df,avg_peak=avg_peak,avg_valley=avg_valley,trend=trend,signal=signal,trades=symbol_trades) # Crea figura Plotly.
-                image_path = os.path.join(CHARTS_DIR, f"{SYMBOL}_{label}.png")  # Ruta de la imagen
-                fig.write_image(image_path, width=1600, height=900, scale=2)    # Guarda la imagen, exporta la grafica
+            # =========================
+            # TRADES ACTIVOS DEL SYMBOL
+            symbol_trades = []
 
+            for username, user_positions in positions.items():
 
-                # ---------------------------
-                # ENVÍO
-                # ---------------------------
-                always_send = SYMBOL in portfolio_symbols
+                if SYMBOL not in user_positions:
+                    continue
 
-                if buy_signal or sell_signal or always_send:
-                    if buy_signal:
-                        action_text = "🟢 ===== COMPRAR ===== 🟢"
-                    elif sell_signal:
-                        action_text = "🔴 ===== VENDER ===== 🔴"
-                    else:
-                        action_text = "📂 ===== PORTFOLIO TRACKING ===== 📂"
-
-                    final_message = (
-                        f"{message}\n"
-                        f"{action_text}\n"
-                        f"📊 Señal: {signal} (Score: {score})\n"
-                        f"📚 OrderBook Imbalance: {imbalance:.2f}"
-                    )
-                    notifier.send_photo(image_path, caption=final_message)      # Telgram recibe imagen y caption
-                    print(f"===> Señal enviada: {SYMBOL} ({label})")
+                if username.upper() == "SALOMON":
+                    trade_color = "#FFD700"
                 else:
-                    print(f"--- {SYMBOL} ({label}) sin señal")
+                    trade_color = "#C77DFF"
 
-                # LIMPIAR IMAGEN
-                if os.path.exists(image_path):
-                    os.remove(image_path)
+                for trade in user_positions[SYMBOL]:
 
-        except Exception as e:
-            print(f"Error en {SYMBOL}: {e}")
+                    symbol_trades.append({
+                        "date": trade["entry_date"],
+                        "price": trade["entry_price"],
+                        "user": username,
+                        "color": trade_color
+                    })
+
+            # ---------------------------
+            # GRÁFICA
+            # ---------------------------
+            fig = build_chart(
+                df=df,
+                avg_peak=avg_peak,
+                avg_valley=avg_valley,
+                trend=trend,
+                signal=signal,
+                trades=symbol_trades
+            )
+
+            image_path = os.path.join(
+                CHARTS_DIR,
+                f"{SYMBOL}_{label}.png"
+            )
+
+            fig.write_image(
+                image_path,
+                width=1600,
+                height=900,
+                scale=2
+            )
+
+            # ---------------------------
+            # ENVÍO
+            # ---------------------------
+            always_send = SYMBOL in portfolio_symbols
+
+            should_send = (
+                buy_signal or
+                sell_signal or
+                always_send or
+                force_send
+            )
+
+            if should_send:
+
+                if buy_signal:
+                    action_text = "🟢 ===== COMPRAR ===== 🟢"
+
+                elif sell_signal:
+                    action_text = "🔴 ===== VENDER ===== 🔴"
+
+                elif force_send:
+                    action_text = "📂 ===== REQUEST ANALYSIS ===== 📂"
+
+                else:
+                    action_text = "📂 ===== PORTFOLIO TRACKING ===== 📂"
+
+                final_message = (
+                    f"{message}\n"
+                    f"{action_text}\n"
+                    f"📊 Señal: {signal} (Score: {score})\n"
+                    f"📚 OrderBook Imbalance: {imbalance:.2f}"
+                )
+
+                notifier.send_photo(
+                    image_path,
+                    caption=final_message
+                )
+
+                print(f"===> Señal enviada: {SYMBOL} ({label})")
+
+            else:
+
+                print(f"--- {SYMBOL} ({label}) sin señal")
+
+            # LIMPIAR IMAGEN
+            if os.path.exists(image_path):
+                os.remove(image_path)
+
+    except Exception as e:
+        print(f"Error en {SYMBOL}: {e}")
+
+
+
+# ---------------------------
+# FUNCIÓN PRINCIPAL
+# ---------------------------
+def run():
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    separator_message = f"""
+━━━━━━━━━━━━━━━━━━━━━━━
+⏰ *Actualización:* {now}
+━━━━━━━━━━━━━━━━━━━━━━━
+"""
+
+    notifier.send_message(separator_message)
+
+    for SYMBOL in SYMBOLS:
+        process_symbol(SYMBOL)

@@ -9,6 +9,18 @@ from data.portfolio.manager import add_position, sell_position, get_trade_histor
 
 from data.portfolio.storage import load_trade_history, load_active_positions
 
+from jobs.run_signal import process_symbol
+from jobs.fetch_binance_data import get_last_timestamp
+from src.api.binance.client import (
+    get_historical_data,
+    get_funding_rate
+)
+
+from processing.cleaning.save_raw import (
+    save_raw_to_csv,
+    save_funding_to_csv
+)
+
 
 load_dotenv()
 
@@ -384,85 +396,7 @@ def check_telegram_updates():
 
                 send_telegram_message(chat_id, message_text)
 
-        # =========================
-        # ANALYZE COMMAND
-        # =========================
-        if text.startswith("/analyze"):
-
-            try:
-
-                parts = text.split()
-
-                symbol = parts[1].upper()
-
-                send_telegram_message(
-                    chat_id,
-                    f"📊 Analizando {symbol}..."
-                )
-
-                from alerts.services.signal_service import generate_signal_data
-
-                # =========================
-                # SEMANA
-                # =========================
-                week_result = generate_signal_data(
-                    symbol=symbol,
-                    label="Semana",
-                    range_option="1 Semana",
-                    prominence=0.01
-                )
-
-                send_telegram_message(
-                    chat_id,
-                    week_result["message"]
-                )
-
-                # opcional imagen
-                with open(week_result["image_path"], "rb") as photo:
-
-                    requests.post(
-                        f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
-                        data={"chat_id": chat_id},
-                        files={"photo": photo}
-                    )
-
-                # =========================
-                # MES
-                # =========================
-                month_result = generate_signal_data(
-                    symbol=symbol,
-                    label="Mes",
-                    range_option="1 Mes",
-                    prominence=0.02
-                )
-
-                send_telegram_message(
-                    chat_id,
-                    month_result["message"]
-                )
-
-                with open(month_result["image_path"], "rb") as photo:
-
-                    requests.post(
-                        f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
-                        data={"chat_id": chat_id},
-                        files={"photo": photo}
-                    )
-
-                # =========================
-                # LIMPIAR
-                # =========================
-                os.remove(week_result["image_path"])
-                os.remove(month_result["image_path"])
-
-            except Exception as e:
-
-                message_text = f"❌ Error ANALYZE:\n{e}"
-
-                print(message_text)
-
-                send_telegram_message(chat_id, message_text)
-
+        
         # =========================
         # STATS COMMAND
         # =========================
@@ -601,3 +535,118 @@ def check_telegram_updates():
                 print(message_text)
 
                 send_telegram_message(chat_id, message_text)
+
+        # =========================
+        # REQUEST COMMAND
+        # =========================
+        if text.startswith("/request"):
+
+            parts = text.split()
+
+            if len(parts) != 2:
+
+                send_telegram_message(
+                    chat_id,
+                    "Uso correcto:\n/request BTCUSDT"
+                )
+
+                continue
+
+            symbol = parts[1].upper()
+
+            try:
+
+                send_telegram_message(
+                    chat_id,
+                    f"📥 Descargando datos de {symbol}..."
+                )
+
+                base_path = os.path.dirname(
+                    os.path.dirname(
+                        os.path.dirname(
+                            os.path.abspath(__file__)
+                        )
+                    )
+                )
+
+                file_path = os.path.join(
+                    base_path,
+                    "data",
+                    "raw",
+                    "binance",
+                    f"{symbol}.csv"
+                )
+
+                last_timestamp = get_last_timestamp(file_path)
+
+                if last_timestamp:
+                    start_time = last_timestamp + 1
+                else:
+                    start_time = int(
+                        pd.Timestamp("2017-01-01").timestamp() * 1000
+                    )
+
+                # =====================================
+                # DESCARGAR KLINES NUEVOS
+                # =====================================
+                data = get_historical_data(
+                    symbol,
+                    "15m",
+                    start_time
+                )
+
+                if data:
+                    save_raw_to_csv(data, symbol, base_path)
+
+                # =====================================
+                # DESCARGAR FUNDING NUEVO
+                # =====================================
+                funding_file = os.path.join(
+                    base_path,
+                    "data",
+                    "raw",
+                    "binance",
+                    "funding_rate",
+                    f"{symbol}.csv"
+                )
+
+                last_funding_timestamp = get_last_timestamp(
+                    funding_file,
+                    column="time"
+                )
+
+                if last_funding_timestamp:
+                    funding_start = last_funding_timestamp + 1
+                else:
+                    funding_start = int(
+                        pd.Timestamp("2017-01-01").timestamp() * 1000
+                    )
+
+                funding_data = get_funding_rate(
+                    symbol,
+                    funding_start
+                )
+
+                if funding_data:
+                    save_funding_to_csv(
+                        funding_data,
+                        symbol,
+                        base_path
+                    )
+
+                send_telegram_message(
+                    chat_id,
+                    f"📊 Analizando {symbol}..."
+                )
+
+                # =====================================
+                # ANALIZAR Y ENVIAR
+                # =====================================
+                process_symbol(symbol, force_send=True)
+
+            except Exception as e:
+
+                send_telegram_message(
+                    chat_id,
+                    f"❌ Error en request:\n{e}"
+                )

@@ -34,6 +34,9 @@ def save_raw_to_csv(data, symbol, base_path):
 
 
 def save_funding_to_csv(data, symbol, base_path):
+    if not data:
+        print(f"⚠️ No funding data para {symbol}")
+        return
     df = pd.DataFrame(data)                                                                 # Crea dataframe para los datos de funding
     df["fundingTime"] = pd.to_datetime(df["fundingTime"], unit="ms")                        # Convierte timestamp a fecha.
     df["fundingRate"] = df["fundingRate"].astype(float)                                     # Convertir a float

@@ -43,7 +43,8 @@ def load_funding(symbol):
 # -------------------------------
 # TRANSFORMATIONS
 def resample_data(df, interval):
-    if interval == "15M":           # 15M = datos originales
+
+    if interval == "15M":
         return df
 
     rule_map = {
@@ -54,20 +55,27 @@ def resample_data(df, interval):
         "Mensual": "M",
         "Anual": "Y"
     }
-    rule = rule_map.get(interval)   # Obtener regla
 
-    if rule is None:                # Proteccion si no existe
+    rule = rule_map.get(interval)
+
+    if rule is None:
         return df
 
-    df = df.resample(rule).agg({    # Agrupa las velas segun el intervalo
+    agg_dict = {
         "open": "first",
         "high": "max",
         "low": "min",
         "close": "last",
-        "volume": "sum",
-        "fundingRate": "mean"
-    })
-    df = df.dropna()                # Elimina velas incompletas, evita velas corruptas
+        "volume": "sum"
+    }
+
+    # Funding opcional
+    if "fundingRate" in df.columns:
+        agg_dict["fundingRate"] = "mean"
+
+    df = df.resample(rule).agg(agg_dict)
+
+    df = df.dropna()
 
     return df
 
@@ -98,9 +106,18 @@ def run_pipeline(symbol, interval, range_option, prominence, window_swings):
     df = load_data(symbol)
     funding_df = load_funding(symbol)
 
-    if funding_df is not None:
-        df = df.merge(funding_df, left_index=True, right_index=True, how="left")    # El merge() une funding con velas 
-        df["fundingRate"] = df["fundingRate"].ffill()                               # Funding no cambia cada vela, entonces rellena espacios.
+    if funding_df is not None and not funding_df.empty:
+        # Validar columna fundingRate
+        if "fundingRate" in funding_df.columns:
+
+            df = df.merge(
+                funding_df,
+                left_index=True,
+                right_index=True,
+                how="left"
+            )
+
+            df["fundingRate"] = df["fundingRate"].ffill()
 
     # 2. Transform
     df = filter_by_range(df, range_option)                                          # Filtra el tiempo
